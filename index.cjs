@@ -16,7 +16,6 @@ const env = {
 
 execSync(commitCommand, { stdio: "inherit", env });
 
-// Push
 execSync(`git push`, { stdio: "inherit" });
 
 console.log("✅ Commit created and pushed with date:", commitDate);
