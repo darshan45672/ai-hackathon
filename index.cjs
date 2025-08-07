@@ -1,6 +1,5 @@
 const { execSync } = require("child_process");
 
-// Your actual file
 const filename = "index.cjs";
 
 // Commit date — 7th August 2025 at 11:00 AM
