@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Navigation } from "@/components/navigation";
 import { ProtectedRoute } from "@/components/protected-route";
 import { Button } from "@/components/ui/button";
@@ -11,8 +12,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Plus, X, FileText, Users, Code, Globe } from "lucide-react";
+import { Plus, X, FileText, Users, Code, Globe, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { ApiClient } from "@/lib/api";
 
 export default function SubmitPage() {
   return (
@@ -26,6 +28,8 @@ export default function SubmitPage() {
 }
 
 function SubmitContent() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -80,7 +84,7 @@ function SubmitContent() {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent, isDraft = false) => {
+  const handleSubmit = async (e: React.FormEvent, isDraft = false) => {
     e.preventDefault();
     
     // Basic validation
@@ -94,9 +98,75 @@ function SubmitContent() {
       return;
     }
 
-    // TODO: Submit to API
-    console.log("Submitting application:", { ...formData, isDraft });
-    toast.success(isDraft ? "Draft saved successfully!" : "Application submitted successfully!");
+    if (!formData.problemStatement.trim()) {
+      toast.error("Please enter a problem statement");
+      return;
+    }
+
+    if (!formData.solution.trim()) {
+      toast.error("Please enter your proposed solution");
+      return;
+    }
+
+    if (!formData.teamSize) {
+      toast.error("Please select team size");
+      return;
+    }
+
+    if (formData.teamMembers.some(member => !member.trim())) {
+      toast.error("Please fill in all team member names");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // Prepare data for submission
+      const submissionData = {
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+        problemStatement: formData.problemStatement.trim(),
+        solution: formData.solution.trim(),
+        techStack: formData.techStack,
+        teamSize: parseInt(formData.teamSize),
+        teamMembers: formData.teamMembers.filter(member => member.trim()),
+        githubRepo: formData.githubRepo.trim() || undefined,
+        demoUrl: formData.demoUrl.trim() || undefined,
+      };
+
+      // Validate URLs if provided
+      if (submissionData.githubRepo && !isValidUrl(submissionData.githubRepo)) {
+        toast.error("Please enter a valid GitHub repository URL");
+        return;
+      }
+
+      if (submissionData.demoUrl && !isValidUrl(submissionData.demoUrl)) {
+        toast.error("Please enter a valid demo URL");
+        return;
+      }
+
+      const application = await ApiClient.createApplication(submissionData);
+      
+      toast.success(isDraft ? "Draft saved successfully!" : "Application submitted successfully!");
+      
+      // Redirect to dashboard or application detail page
+      router.push(`/applications/${application.id}`);
+      
+    } catch (error) {
+      console.error('Failed to submit application:', error);
+      toast.error(error instanceof Error ? error.message : "Failed to submit application. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const isValidUrl = (url: string): boolean => {
+    try {
+      new URL(url);
+      return true;
+    } catch {
+      return false;
+    }
   };
 
   return (
@@ -305,10 +375,13 @@ function SubmitContent() {
               type="button"
               variant="outline"
               onClick={(e) => handleSubmit(e, true)}
+              disabled={loading}
             >
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Save as Draft
             </Button>
-            <Button type="submit">
+            <Button type="submit" disabled={loading}>
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Submit Application
             </Button>
           </div>
