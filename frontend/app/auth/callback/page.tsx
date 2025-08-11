@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authService } from "@/lib/auth";
 import { useAuth } from "@/contexts/auth-context";
@@ -10,34 +10,39 @@ export default function AuthCallbackPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { refreshUser } = useAuth();
+  const hasProcessed = useRef(false);
 
-  useEffect(() => {
-    const handleCallback = async () => {
-      const token = searchParams.get('token');
-      
-      if (token) {
-        try {
-          // Store the token
-          authService.setToken(token);
-          
-          // Refresh user data to get the complete profile
-          await refreshUser();
-          
-          toast.success("Sign in successful!");
-          router.push('/dashboard');
-        } catch (error) {
-          console.error('Failed to fetch user profile:', error);
-          toast.error("Failed to complete sign in. Please try again.");
-          router.push('/auth/signin');
-        }
-      } else {
-        toast.error("Authentication failed. Please try again.");
+  const handleCallback = useCallback(async () => {
+    // Prevent multiple executions
+    if (hasProcessed.current) return;
+    hasProcessed.current = true;
+
+    const token = searchParams.get('token');
+    
+    if (token) {
+      try {
+        // Store the token
+        authService.setToken(token);
+        
+        // Refresh user data to get the complete profile
+        await refreshUser();
+        
+        toast.success("Sign in successful!");
+        router.push('/dashboard');
+      } catch (error) {
+        console.error('Failed to fetch user profile:', error);
+        toast.error("Failed to complete sign in. Please try again.");
         router.push('/auth/signin');
       }
-    };
-
-    handleCallback();
+    } else {
+      toast.error("Authentication failed. Please try again.");
+      router.push('/auth/signin');
+    }
   }, [searchParams, router, refreshUser]);
+
+  useEffect(() => {
+    handleCallback();
+  }, [handleCallback]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">

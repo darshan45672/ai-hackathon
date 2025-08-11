@@ -37,6 +37,7 @@ export default function SignInPage() {
   };
 
   const handleGithubSignIn = () => {
+    // No toast here - OAuth callback will handle success/error messages
     loginWithGithub();
   };
 
