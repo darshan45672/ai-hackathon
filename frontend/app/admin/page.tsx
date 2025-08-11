@@ -1,6 +1,7 @@
 "use client";
 
 import { Navigation } from "@/components/navigation";
+import { AdminProtectedRoute } from "@/components/admin-protected-route";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,17 +14,23 @@ import {
   Calendar, Eye, Star, BarChart3, Filter
 } from "lucide-react";
 import Link from "next/link";
+import { useAuth } from "@/contexts/auth-context";
 
 export default function AdminPage() {
-  // Mock admin user data
-  const user = {
-    id: "admin1",
-    name: "Admin User",
-    email: "admin@hackathon.com",
-    role: "ADMIN"
-  };
+  return (
+    <AdminProtectedRoute>
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <AdminDashboardContent />
+      </div>
+    </AdminProtectedRoute>
+  );
+}
 
-  // Mock applications data for admin view
+function AdminDashboardContent() {
+  const { user } = useAuth();
+
+  // Mock applications data for admin view - In real implementation, this would come from API
   const applications = [
     {
       id: "1",
@@ -124,17 +131,19 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navigation user={user} />
-      
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground">Admin Dashboard</h1>
-          <p className="text-muted-foreground mt-2">
-            Review and manage all hackathon applications
-          </p>
-        </div>
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-foreground">Admin Dashboard</h1>
+        <p className="text-muted-foreground mt-2">
+          Review and manage all hackathon applications
+        </p>
+        {user && (
+          <div className="mt-2 text-sm text-muted-foreground">
+            Welcome back, <span className="font-medium">{user.name}</span> ({user.role})
+          </div>
+        )}
+      </div>
 
         {/* Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -311,6 +320,5 @@ export default function AdminPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
   );
 }
