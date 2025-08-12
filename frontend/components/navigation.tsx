@@ -44,22 +44,25 @@ const navItems: NavItem[] = [
     title: "Dashboard",
     href: "/dashboard",
     icon: <BarChart3 className="h-4 w-4" />,
+    roles: ["PARTICIPANT"], // Only participants can access dashboard
   },
   {
     title: "Submit Idea",
     href: "/submit",
     icon: <FileText className="h-4 w-4" />,
+    roles: ["PARTICIPANT"], // Only participants can submit ideas
   },
   {
     title: "My Applications",
     href: "/applications",
     icon: <Trophy className="h-4 w-4" />,
+    roles: ["PARTICIPANT"], // Only participants have applications
   },
   {
     title: "Admin Panel",
     href: "/admin",
     icon: <Users className="h-4 w-4" />,
-    roles: ["ADMIN"],
+    roles: ["ADMIN"], // Only admins can access admin panel
   },
 ];
 

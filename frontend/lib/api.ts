@@ -111,6 +111,43 @@ export class ApiClient {
       method: 'DELETE',
     });
   }
+
+  // Admin-only methods
+  static async getAllApplications(page: number = 1, limit: number = 10, status?: string): Promise<ApplicationsResponse> {
+    // Simplified approach - just fetch all applications without complex parameters
+    const url = `/api/applications`;
+    console.log('API Request URL (simplified):', `${API_BASE_URL}${url}`);
+    console.log('Auth token present:', !!this.getAuthToken());
+    
+    try {
+      const response = await this.fetchWithAuth(url);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Error Response:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText
+        });
+        throw new Error(`API Error: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('API Response success - applications count:', data.applications?.length || 0);
+      return data;
+    } catch (error) {
+      console.error('Fetch error:', error);
+      throw error;
+    }
+  }
+
+  static async updateApplicationStatus(id: string, status: string): Promise<Application> {
+    const response = await this.fetchWithAuth(`/api/applications/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+    return response.json();
+  }
 }
 
 export type { Application, ApplicationsResponse };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Navigation } from "@/components/navigation";
 import { ProtectedRoute } from "@/components/protected-route";
@@ -15,6 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { Plus, X, FileText, Users, Code, Globe, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { ApiClient } from "@/lib/api";
+import { useAuth } from "@/contexts/auth-context";
 
 export default function SubmitPage() {
   return (
@@ -28,8 +29,18 @@ export default function SubmitPage() {
 }
 
 function SubmitContent() {
+  const { user } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+
+  // Redirect admin users to admin panel - they shouldn't access participant features
+  useEffect(() => {
+    if (user && user.role === 'ADMIN') {
+      router.replace('/admin');
+      return;
+    }
+  }, [user, router]);
+
   const [formData, setFormData] = useState({
     title: "",
     description: "",

@@ -45,9 +45,15 @@ export default function SignUpPage() {
     }
 
     try {
-      await register(formData.email, formData.password, formData.firstName, formData.lastName);
+      const user = await register(formData.email, formData.password, formData.firstName, formData.lastName);
       toast.success("Account created successfully! Welcome to AI Hackathon.");
-      router.push("/dashboard");
+      
+      // Redirect based on user role
+      if (user.role === 'ADMIN') {
+        router.push("/admin");
+      } else {
+        router.push("/dashboard");
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Registration failed. Please try again.");
     }

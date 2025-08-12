@@ -26,6 +26,7 @@ import {
 import Link from "next/link";
 import { ApiClient, type Application } from "@/lib/api";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/auth-context";
 
 export default function ApplicationDetailPage() {
   return (
@@ -39,6 +40,7 @@ export default function ApplicationDetailPage() {
 }
 
 function ApplicationDetailContent() {
+  const { user } = useAuth();
   const params = useParams();
   const router = useRouter();
   const [application, setApplication] = useState<Application | null>(null);
@@ -46,6 +48,14 @@ function ApplicationDetailContent() {
   const [error, setError] = useState<string | null>(null);
 
   const applicationId = params.id as string;
+
+  // Redirect admin users to admin panel - they shouldn't access participant features
+  useEffect(() => {
+    if (user && user.role === 'ADMIN') {
+      router.replace('/admin');
+      return;
+    }
+  }, [user, router]);
 
   useEffect(() => {
     const fetchApplication = async () => {
