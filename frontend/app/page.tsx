@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,8 +9,11 @@ import {
   Trophy, Users, FileText, ArrowRight, Github, Mail, 
   Sparkles, Zap, Target, Rocket, Star, Code, Brain, Award
 } from "lucide-react";
+import { useAuth } from "@/contexts/auth-context";
 
 export default function HomePage() {
+  const { user } = useAuth();
+  
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
@@ -291,15 +296,23 @@ export default function HomePage() {
             <div>
               <h3 className="font-semibold mb-4">Platform</h3>
               <div className="space-y-2">
-                <Link href="/dashboard" className="block text-sm text-muted-foreground hover:text-foreground transition-colors">
-                  Dashboard
-                </Link>
-                <Link href="/submit" className="block text-sm text-muted-foreground hover:text-foreground transition-colors">
-                  Submit Project
-                </Link>
-                <Link href="/applications" className="block text-sm text-muted-foreground hover:text-foreground transition-colors">
-                  My Applications
-                </Link>
+                {user?.role === 'ADMIN' ? (
+                  <Link href="/admin" className="block text-sm text-muted-foreground hover:text-foreground transition-colors">
+                    Admin Panel
+                  </Link>
+                ) : (
+                  <>
+                    <Link href="/dashboard" className="block text-sm text-muted-foreground hover:text-foreground transition-colors">
+                      Dashboard
+                    </Link>
+                    <Link href="/submit" className="block text-sm text-muted-foreground hover:text-foreground transition-colors">
+                      Submit Project
+                    </Link>
+                    <Link href="/applications" className="block text-sm text-muted-foreground hover:text-foreground transition-colors">
+                      My Applications
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
 

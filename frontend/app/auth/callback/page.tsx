@@ -27,8 +27,17 @@ export default function AuthCallbackPage() {
         // Refresh user data to get the complete profile
         await refreshUser();
         
+        // Get the user profile to determine redirect
+        const userProfile = await authService.getProfile(token);
+        
         toast.success("Sign in successful!");
-        router.push('/dashboard');
+        
+        // Redirect based on user role
+        if (userProfile.role === 'ADMIN') {
+          router.push('/admin');
+        } else {
+          router.push('/dashboard');
+        }
       } catch (error) {
         console.error('Failed to fetch user profile:', error);
         toast.error("Failed to complete sign in. Please try again.");

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Navigation } from "@/components/navigation";
 import { ProtectedRoute } from "@/components/protected-route";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Trophy, Users, FileText, Clock, CheckCircle, XCircle, AlertCircle, Loader2, RefreshCw, Plus, Calendar, Target, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { ApiClient, type Application } from "@/lib/api";
+import { useAuth } from "@/contexts/auth-context";
 
 export default function DashboardPage() {
   return (
@@ -22,9 +24,19 @@ export default function DashboardPage() {
 }
 
 function DashboardContent() {
+  const { user } = useAuth();
+  const router = useRouter();
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Redirect admin users to admin panel - they shouldn't access participant dashboard
+  useEffect(() => {
+    if (user && user.role === 'ADMIN') {
+      router.replace('/admin');
+      return;
+    }
+  }, [user, router]);
 
   const fetchApplications = async () => {
     try {

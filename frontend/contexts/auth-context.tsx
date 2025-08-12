@@ -44,8 +44,8 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
 }
 
 interface AuthContextType extends AuthState {
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
+  register: (email: string, password: string, firstName: string, lastName: string) => Promise<User>;
   logout: () => void;
   loginWithGoogle: () => void;
   loginWithGithub: () => void;
@@ -83,6 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response: AuthResponse = await authService.login({ email, password });
       authService.setToken(response.access_token);
       dispatch({ type: 'SET_USER', payload: response.user });
+      return response.user;
     } catch (error) {
       dispatch({ type: 'SET_LOADING', payload: false });
       throw error;
@@ -100,6 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       authService.setToken(response.access_token);
       dispatch({ type: 'SET_USER', payload: response.user });
+      return response.user;
     } catch (error) {
       dispatch({ type: 'SET_LOADING', payload: false });
       throw error;

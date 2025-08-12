@@ -28,9 +28,15 @@ export default function SignInPage() {
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await login(email, password);
+      const user = await login(email, password);
       toast.success("Welcome back! You have been successfully signed in.");
-      router.push("/dashboard");
+      
+      // Redirect based on user role
+      if (user.role === 'ADMIN') {
+        router.push("/admin");
+      } else {
+        router.push("/dashboard");
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Please check your credentials and try again.");
     }

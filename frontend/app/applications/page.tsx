@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Navigation } from "@/components/navigation";
 import { ProtectedRoute } from "@/components/protected-route";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Trophy, Users, FileText, Clock, CheckCircle, XCircle, Search, Calendar, Eye } from "lucide-react";
 import Link from "next/link";
+import { useAuth } from "@/contexts/auth-context";
 
 export default function ApplicationsPage() {
   return (
@@ -23,6 +26,17 @@ export default function ApplicationsPage() {
 }
 
 function ApplicationsContent() {
+  const { user } = useAuth();
+  const router = useRouter();
+
+  // Redirect admin users to admin panel - they shouldn't access participant features
+  useEffect(() => {
+    if (user && user.role === 'ADMIN') {
+      router.replace('/admin');
+      return;
+    }
+  }, [user, router]);
+
   // Mock applications data
   const applications = [
     {
