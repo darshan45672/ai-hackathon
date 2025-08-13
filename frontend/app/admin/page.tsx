@@ -200,6 +200,9 @@ function AdminDashboardContent() {
         {user && (
           <div className="mt-2 text-sm text-muted-foreground">
             Welcome back, <span className="font-medium">{user.name}</span> ({user.role})
+            <div className="mt-1 text-xs text-green-600">
+              ✨ Notification system is now active! You'll receive real-time updates for application status changes.
+            </div>
           </div>
         )}
       </div>

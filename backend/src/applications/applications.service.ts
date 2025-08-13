@@ -1,11 +1,15 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateApplicationDto } from './dto/create-application.dto';
 import { UpdateApplicationDto } from './dto/update-application.dto';
 
 @Injectable()
 export class ApplicationsService {
-  constructor(private databaseService: DatabaseService) {}
+  constructor(
+    private databaseService: DatabaseService,
+    private notificationsService: NotificationsService,
+  ) {}
 
   async create(createApplicationDto: CreateApplicationDto, userId: string) {
     return this.databaseService.application.create({
@@ -126,8 +130,19 @@ export class ApplicationsService {
     });
   }
 
-  async updateStatus(id: string, status: string) {
-    return this.databaseService.application.update({
+  async updateStatus(id: string, status: string, adminUserId?: string) {
+    // First get the current application to check previous status
+    const currentApplication = await this.databaseService.application.findUnique({
+      where: { id },
+      include: { user: true },
+    });
+
+    if (!currentApplication) {
+      throw new NotFoundException('Application not found');
+    }
+
+    // Update the application status
+    const updatedApplication = await this.databaseService.application.update({
       where: { id },
       data: { 
         status: status as any,
@@ -142,6 +157,35 @@ export class ApplicationsService {
         },
       },
     });
+
+    // Create notification for the applicant if status changed
+    if (currentApplication.status !== status) {
+      await this.notificationsService.createApplicationStatusNotification(
+        id,
+        currentApplication.userId,
+        status,
+        adminUserId,
+      );
+
+      // If a new application is submitted, notify all admins
+      if (status === 'SUBMITTED' && currentApplication.status === 'DRAFT') {
+        const admins = await this.databaseService.user.findMany({
+          where: { role: 'ADMIN' },
+          select: { id: true },
+        });
+
+        for (const admin of admins) {
+          await this.notificationsService.createNewApplicationNotification(
+            currentApplication.title,
+            currentApplication.user.name,
+            id,
+            admin.id,
+          );
+        }
+      }
+    }
+
+    return updatedApplication;
   }
 
   async remove(id: string, userId: string, userRole: string) {

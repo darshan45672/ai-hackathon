@@ -26,11 +26,11 @@ import {
   Sparkles,
   User,
   Settings,
-  Bell,
   ChevronDown
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
+import { NotificationBell } from "@/components/notification-bell";
 
 interface NavItem {
   title: string;
@@ -173,12 +173,7 @@ export function Navigation() {
             {isAuthenticated && user ? (
               <>
                 {/* Notifications Bell */}
-                <Button variant="ghost" size="icon" className="relative hover:bg-muted/80 transition-all duration-300 hover:scale-105">
-                  <Bell className="h-4 w-4" />
-                  <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 text-xs bg-gradient-to-r from-red-500 to-pink-500 border-0">
-                    3
-                  </Badge>
-                </Button>
+                <NotificationBell />
 
                 {/* Enhanced User Dropdown */}
                 <DropdownMenu>

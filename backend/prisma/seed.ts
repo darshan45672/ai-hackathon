@@ -1,4 +1,4 @@
-import { PrismaClient, UserRole } from '@prisma/client';
+import { PrismaClient, UserRole, NotificationType } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -13,6 +13,40 @@ async function main() {
 
   if (existingAdmin) {
     console.log('⚠️  Admin user already exists, skipping creation');
+    
+    // Create a test notification for the existing admin if it doesn't exist
+    const existingNotification = await prisma.notification.findFirst({
+      where: { 
+        userId: existingAdmin.id,
+        title: 'Welcome to AI Hackathon Platform'
+      },
+    });
+
+    if (!existingNotification) {
+      const testNotification = await prisma.notification.create({
+        data: {
+          type: NotificationType.SYSTEM_ANNOUNCEMENT,
+          title: 'Welcome to AI Hackathon Platform',
+          message: 'Your notification system is working correctly! You can now receive real-time updates about your applications.',
+          userId: existingAdmin.id,
+          senderId: existingAdmin.id,
+          actionUrl: '/dashboard',
+          metadata: {
+            test: true,
+            category: 'welcome'
+          }
+        },
+      });
+
+      console.log('✅ Test notification created:', {
+        id: testNotification.id,
+        title: testNotification.title,
+        type: testNotification.type,
+      });
+    } else {
+      console.log('⚠️  Test notification already exists');
+    }
+    
     return;
   }
 
@@ -61,6 +95,28 @@ async function main() {
     id: sampleApplication.id,
     title: sampleApplication.title,
     status: sampleApplication.status,
+  });
+
+  // Create a test notification
+  const testNotification = await prisma.notification.create({
+    data: {
+      type: NotificationType.SYSTEM_ANNOUNCEMENT,
+      title: 'Welcome to AI Hackathon Platform',
+      message: 'Your notification system is working correctly! You can now receive real-time updates about your applications.',
+      userId: adminUser.id,
+      senderId: adminUser.id,
+      actionUrl: '/dashboard',
+      metadata: {
+        test: true,
+        category: 'welcome'
+      }
+    },
+  });
+
+  console.log('✅ Test notification created:', {
+    id: testNotification.id,
+    title: testNotification.title,
+    type: testNotification.type,
   });
 
   console.log('🎉 Database seeding completed successfully!');
