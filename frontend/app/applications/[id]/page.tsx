@@ -115,10 +115,10 @@ function ApplicationDetailContent() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <span className="ml-2 text-muted-foreground">Loading application...</span>
+        <div className="mx-auto max-w-4xl px-6 py-12">
+          <div className="flex flex-col items-center justify-center py-24 space-y-4">
+            <div className="w-8 h-8 border-2 border-muted border-t-foreground rounded-full animate-spin"></div>
+            <p className="text-sm text-muted-foreground">Loading application...</p>
           </div>
         </div>
       </div>
@@ -128,20 +128,24 @@ function ApplicationDetailContent() {
   if (error || !application) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-          <div className="text-center py-12">
-            <XCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2 text-red-600">Error Loading Application</h3>
-            <p className="text-muted-foreground mb-4">{error}</p>
-            <div className="space-x-4">
-              <Button variant="outline" onClick={() => router.back()}>
+        <div className="mx-auto max-w-4xl px-6 py-12">
+          <div className="flex flex-col items-center justify-center py-24 space-y-6">
+            <div className="w-12 h-12 rounded-full bg-red-50 dark:bg-red-950/20 flex items-center justify-center">
+              <XCircle className="h-6 w-6 text-red-500" />
+            </div>
+            <div className="text-center space-y-2">
+              <h3 className="text-lg font-medium">Application not found</h3>
+              <p className="text-sm text-muted-foreground max-w-md">
+                {error || 'The application you are looking for could not be found.'}
+              </p>
+            </div>
+            <div className="flex gap-3 pt-4">
+              <Button variant="outline" onClick={() => router.back()} size="sm">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Go Back
               </Button>
-              <Button asChild>
-                <Link href="/dashboard">
-                  Return to Dashboard
-                </Link>
+              <Button asChild size="sm">
+                <Link href="/dashboard">Dashboard</Link>
               </Button>
             </div>
           </div>
@@ -152,73 +156,84 @@ function ApplicationDetailContent() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-4xl px-6 py-12">
         {/* Header */}
-        <div className="mb-8">
-          <Button variant="ghost" onClick={() => router.back()} className="mb-4">
+        <div className="mb-16">
+          <Button 
+            variant="ghost" 
+            onClick={() => router.back()} 
+            className="mb-8 -ml-3 text-muted-foreground hover:text-foreground"
+            size="sm"
+          >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back
           </Button>
           
-          <div className="flex items-start justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">{application.title}</h1>
-              <p className="text-muted-foreground mt-2">
-                Application Details
-              </p>
+          <div className="space-y-6">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h1 className="text-3xl font-bold tracking-tight">{application.title}</h1>
+                <Badge 
+                  variant="outline" 
+                  className={`${getStatusColor(application.status)} border-none`}
+                >
+                  {application.status?.toUpperCase() || 'UNKNOWN'}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Calendar className="h-4 w-4" />
+                <span>
+                  {application.submittedAt 
+                    ? new Date(application.submittedAt).toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                      })
+                    : new Date(application.createdAt).toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                      })
+                  }
+                </span>
+              </div>
             </div>
-            <Badge className={`${getStatusColor(application.status)} flex items-center gap-2`}>
-              {getStatusIcon(application.status)}
-              {application.status?.toUpperCase() || 'UNKNOWN'}
-            </Badge>
           </div>
         </div>
 
-        <div className="space-y-8">
+        <div className="space-y-12">
           {/* Project Overview */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                <CardTitle>Project Overview</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <section className="space-y-6">
+            <h2 className="text-xl font-semibold tracking-tight">Overview</h2>
+            <div className="space-y-8">
               <div>
-                <h4 className="font-semibold mb-2">Description</h4>
-                <p className="text-muted-foreground">{application.description}</p>
+                <h3 className="text-sm font-medium text-muted-foreground mb-3">Description</h3>
+                <p className="text-foreground leading-relaxed">{application.description}</p>
               </div>
-              
-              <Separator />
               
               <div>
-                <h4 className="font-semibold mb-2">Problem Statement</h4>
-                <p className="text-muted-foreground">{application.problemStatement}</p>
+                <h3 className="text-sm font-medium text-muted-foreground mb-3">Problem Statement</h3>
+                <p className="text-foreground leading-relaxed">{application.problemStatement}</p>
               </div>
-              
-              <Separator />
               
               <div>
-                <h4 className="font-semibold mb-2">Proposed Solution</h4>
-                <p className="text-muted-foreground">{application.solution}</p>
+                <h3 className="text-sm font-medium text-muted-foreground mb-3">Solution</h3>
+                <p className="text-foreground leading-relaxed">{application.solution}</p>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </section>
+
+          <Separator />
 
           {/* Technical Details */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Code className="h-5 w-5" />
-                <CardTitle>Technical Details</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <section className="space-y-6">
+            <h2 className="text-xl font-semibold tracking-tight">Technical Details</h2>
+            <div className="space-y-6">
               <div>
-                <h4 className="font-semibold mb-2">Tech Stack</h4>
+                <h3 className="text-sm font-medium text-muted-foreground mb-3">Tech Stack</h3>
                 <div className="flex flex-wrap gap-2">
                   {application.techStack.map((tech) => (
-                    <Badge key={tech} variant="secondary">
+                    <Badge key={tech} variant="secondary" className="text-xs">
                       {tech}
                     </Badge>
                   ))}
@@ -226,94 +241,114 @@ function ApplicationDetailContent() {
               </div>
               
               {(application.githubRepo || application.demoUrl) && (
-                <>
-                  <Separator />
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {application.githubRepo && (
-                      <div>
-                        <h4 className="font-semibold mb-2 flex items-center gap-2">
-                          <Github className="h-4 w-4" />
-                          GitHub Repository
-                        </h4>
-                        <Button variant="outline" asChild className="w-full">
-                          <a href={application.githubRepo} target="_blank" rel="noopener noreferrer">
-                            <ExternalLink className="mr-2 h-4 w-4" />
-                            View Repository
-                          </a>
-                        </Button>
-                      </div>
-                    )}
-                    
-                    {application.demoUrl && (
-                      <div>
-                        <h4 className="font-semibold mb-2 flex items-center gap-2">
-                          <Globe className="h-4 w-4" />
-                          Live Demo
-                        </h4>
-                        <Button variant="outline" asChild className="w-full">
-                          <a href={application.demoUrl} target="_blank" rel="noopener noreferrer">
-                            <ExternalLink className="mr-2 h-4 w-4" />
-                            View Demo
-                          </a>
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                  {application.githubRepo && (
+                    <Button variant="outline" asChild className="justify-start h-auto p-4">
+                      <a href={application.githubRepo} target="_blank" rel="noopener noreferrer">
+                        <div className="flex items-center gap-3">
+                          <Github className="h-5 w-5" />
+                          <div className="text-left">
+                            <div className="font-medium">Repository</div>
+                            <div className="text-xs text-muted-foreground">View source code</div>
+                          </div>
+                        </div>
+                        <ExternalLink className="ml-auto h-4 w-4 opacity-50" />
+                      </a>
+                    </Button>
+                  )}
+                  
+                  {application.demoUrl && (
+                    <Button variant="outline" asChild className="justify-start h-auto p-4">
+                      <a href={application.demoUrl} target="_blank" rel="noopener noreferrer">
+                        <div className="flex items-center gap-3">
+                          <Globe className="h-5 w-5" />
+                          <div className="text-left">
+                            <div className="font-medium">Live Demo</div>
+                            <div className="text-xs text-muted-foreground">Try the app</div>
+                          </div>
+                        </div>
+                        <ExternalLink className="ml-auto h-4 w-4 opacity-50" />
+                      </a>
+                    </Button>
+                  )}
+                </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </section>
+
+          <Separator />
 
           {/* Team Information */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                <CardTitle>Team Information</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <h4 className="font-semibold mb-2">Team Size</h4>
-                  <p className="text-muted-foreground">{application.teamSize} members</p>
-                </div>
-                <div>
-                  <h4 className="font-semibold mb-2">Submitted</h4>
-                  <p className="text-muted-foreground flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    {application.submittedAt 
-                      ? new Date(application.submittedAt).toLocaleDateString()
-                      : new Date(application.createdAt).toLocaleDateString()
-                    }
-                  </p>
-                </div>
-              </div>
-              
-              <Separator />
-              
+          <section className="space-y-6">
+            <h2 className="text-xl font-semibold tracking-tight">Team</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
               <div>
-                <h4 className="font-semibold mb-2">Team Members</h4>
-                <div className="space-y-2">
-                  {application.teamMembers.map((member, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <Badge variant="outline">
-                        {index === 0 ? 'Team Leader' : 'Member'}
-                      </Badge>
-                      <span>{member}</span>
-                    </div>
-                  ))}
+                <h3 className="text-sm font-medium text-muted-foreground mb-3">Team Size</h3>
+                <div className="text-2xl font-bold">
+                  {application.teamSize} {application.teamSize === 1 ? 'member' : 'members'}
                 </div>
               </div>
-            </CardContent>
-          </Card>
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground mb-3">Submitted</h3>
+                <div className="space-y-1">
+                  <div className="font-medium">
+                    {application.submittedAt 
+                      ? new Date(application.submittedAt).toLocaleDateString('en-US', { 
+                          weekday: 'long',
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric' 
+                        })
+                      : new Date(application.createdAt).toLocaleDateString('en-US', { 
+                          weekday: 'long',
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric' 
+                        })
+                    }
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {application.submittedAt 
+                      ? new Date(application.submittedAt).toLocaleTimeString('en-US', { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })
+                      : new Date(application.createdAt).toLocaleTimeString('en-US', { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })
+                    }
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div>
+              <h3 className="text-sm font-medium text-muted-foreground mb-4">Members</h3>
+              <div className="space-y-3">
+                {application.teamMembers.map((member, index) => (
+                  <div key={index} className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center text-sm font-medium">
+                      {member.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium">{member}</div>
+                      {index === 0 && (
+                        <div className="text-xs text-muted-foreground">Team Leader</div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <Separator />
 
           {/* Actions */}
-          <div className="flex gap-4 justify-end">
+          <div className="flex justify-end gap-3 pt-4">
             <Button variant="outline" asChild>
-              <Link href="/dashboard">
-                Return to Dashboard
-              </Link>
+              <Link href="/dashboard">Dashboard</Link>
             </Button>
             {application.status?.toUpperCase() === 'DRAFT' && (
               <Button asChild>
