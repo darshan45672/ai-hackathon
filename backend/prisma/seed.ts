@@ -18,7 +18,7 @@ async function main() {
     const existingNotification = await prisma.notification.findFirst({
       where: { 
         userId: existingAdmin.id,
-        title: 'Welcome to AI Hackathon Platform'
+        title: 'Welcome to Hack-Ai thon Platform'
       },
     });
 
@@ -26,7 +26,7 @@ async function main() {
       const testNotification = await prisma.notification.create({
         data: {
           type: NotificationType.SYSTEM_ANNOUNCEMENT,
-          title: 'Welcome to AI Hackathon Platform',
+          title: 'Welcome to Hack-Ai thon Platform',
           message: 'Your notification system is working correctly! You can now receive real-time updates about your applications.',
           userId: existingAdmin.id,
           senderId: existingAdmin.id,
@@ -101,7 +101,7 @@ async function main() {
   const testNotification = await prisma.notification.create({
     data: {
       type: NotificationType.SYSTEM_ANNOUNCEMENT,
-      title: 'Welcome to AI Hackathon Platform',
+      title: 'Welcome to Hack-Ai thon Platform',
       message: 'Your notification system is working correctly! You can now receive real-time updates about your applications.',
       userId: adminUser.id,
       senderId: adminUser.id,

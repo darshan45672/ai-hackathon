@@ -159,7 +159,7 @@ export class NotificationsService {
       DRAFT: 'Your application has been saved as a draft.',
       SUBMITTED: '🎉 Your application has been submitted successfully! Our team will review it shortly.',
       UNDER_REVIEW: '👀 Your application is now under review by our evaluation team.',
-      ACCEPTED: '🎉 Congratulations! Your application has been accepted! Welcome to the AI Hackathon!',
+      ACCEPTED: '🎉 Congratulations! Your application has been accepted! Welcome to the Hack-Ai thon!',
       REJECTED: '❌ Your application has been rejected. Please check the feedback and feel free to reapply.',
     };
 

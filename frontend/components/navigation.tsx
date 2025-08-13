@@ -26,7 +26,8 @@ import {
   Sparkles,
   User,
   Settings,
-  ChevronDown
+  ChevronDown,
+  Bell
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
@@ -57,6 +58,12 @@ const navItems: NavItem[] = [
     href: "/applications",
     icon: <Trophy className="h-4 w-4" />,
     roles: ["PARTICIPANT"], // Only participants have applications
+  },
+  {
+    title: "Notifications",
+    href: "/notifications",
+    icon: <Bell className="h-4 w-4" />,
+    roles: ["PARTICIPANT"], // Only participants get notifications
   },
   {
     title: "Admin Panel",
@@ -135,7 +142,7 @@ export function Navigation() {
               </div>
               <div className="flex flex-col">
                 <span className="font-bold text-xl bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
-                  AI Hackathon
+                  Hack-Ai thon
                 </span>
                 <span className="text-xs text-muted-foreground -mt-1">2025</span>
               </div>
@@ -271,7 +278,7 @@ export function Navigation() {
                           </div>
                         </div>
                         <div>
-                          <h3 className="font-bold text-lg">AI Hackathon</h3>
+                          <h3 className="font-bold text-lg">Hack-Ai thon</h3>
                           <p className="text-sm text-muted-foreground">2025 Edition</p>
                         </div>
                       </div>

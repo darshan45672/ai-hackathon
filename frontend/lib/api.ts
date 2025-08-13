@@ -174,21 +174,24 @@ export class ApiClient {
     return response.json();
   }
 
-  // Notification methods
-  static async getNotifications(page: number = 1, limit: number = 20, read?: boolean): Promise<NotificationsResponse> {
+  // Notification endpoints
+  static async getNotifications(page = 1, limit = 20, read?: boolean): Promise<NotificationsResponse> {
     const params = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
-      ...(read !== undefined && { read: read.toString() }),
     });
-
+    
+    if (read !== undefined) {
+      params.append('read', read.toString());
+    }
+    
     const response = await this.fetchWithAuth(`/api/notifications?${params}`);
     return response.json();
   }
 
   static async getUnreadCount(): Promise<number> {
     const response = await this.fetchWithAuth('/api/notifications/unread-count');
-    return response.json();
+    return response.json(); // Backend returns plain number
   }
 
   static async markNotificationAsRead(id: string): Promise<Notification> {

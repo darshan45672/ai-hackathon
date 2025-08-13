@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI Hackathon Platform",
+  title: "Hack-Ai thon Platform",
   description: "Submit and manage your hackathon ideas",
 };
 

@@ -1,4 +1,4 @@
-# AI Hackathon Application
+# Hack-Ai thon Application
 
 A scalable web application built with NestJS backend and Next.js frontend, deployed using Docker with load balancing and monitoring.
 
