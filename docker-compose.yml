@@ -17,15 +17,25 @@ services:
 
   # Application instances (3 replicas for load balancing)
   app1:
-    build: .
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
       - PORT=3001
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - JWT_SECRET=${JWT_SECRET}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
     depends_on:
       - redis
+      - postgres
     restart: unless-stopped
     deploy:
       resources:
@@ -34,15 +44,25 @@ services:
           cpus: '0.5'
 
   app2:
-    build: .
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
       - PORT=3001
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - JWT_SECRET=${JWT_SECRET}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
     depends_on:
       - redis
+      - postgres
     restart: unless-stopped
     deploy:
       resources:
@@ -51,20 +71,48 @@ services:
           cpus: '0.5'
 
   app3:
-    build: .
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
       - PORT=3001
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - JWT_SECRET=${JWT_SECRET}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
     depends_on:
       - redis
+      - postgres
     restart: unless-stopped
     deploy:
       resources:
         limits:
           memory: 512M
+          cpus: '0.5'
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-ai_hackathon}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
           cpus: '0.5'
 
   # Redis for caching and session management
@@ -104,6 +152,7 @@ services:
 volumes:
   redis_data:
   grafana_data:
+  postgres_data:
 
 networks:
   default:
