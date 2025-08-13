@@ -156,15 +156,24 @@ export class NotificationsService {
     senderId?: string,
   ): Promise<Notification> {
     const statusMessages = {
-      SUBMITTED: 'Your application has been submitted successfully!',
-      UNDER_REVIEW: 'Your application is now under review.',
-      ACCEPTED: '🎉 Congratulations! Your application has been accepted!',
-      REJECTED: 'Your application has been rejected. Please check the feedback.',
+      DRAFT: 'Your application has been saved as a draft.',
+      SUBMITTED: '🎉 Your application has been submitted successfully! Our team will review it shortly.',
+      UNDER_REVIEW: '👀 Your application is now under review by our evaluation team.',
+      ACCEPTED: '🎉 Congratulations! Your application has been accepted! Welcome to the AI Hackathon!',
+      REJECTED: '❌ Your application has been rejected. Please check the feedback and feel free to reapply.',
+    };
+
+    const statusTitles = {
+      DRAFT: 'Application Saved',
+      SUBMITTED: 'Application Submitted',
+      UNDER_REVIEW: 'Application Under Review',
+      ACCEPTED: 'Application Accepted',
+      REJECTED: 'Application Rejected',
     };
 
     return this.create({
       type: NotificationType.APPLICATION_STATUS_CHANGE,
-      title: `Application Status Updated`,
+      title: statusTitles[newStatus] || `Application Status Updated`,
       message: statusMessages[newStatus] || `Your application status has been changed to ${newStatus}`,
       userId,
       senderId,
@@ -172,6 +181,7 @@ export class NotificationsService {
       metadata: {
         applicationId,
         newStatus,
+        timestamp: new Date().toISOString(),
       },
     });
   }
@@ -184,14 +194,15 @@ export class NotificationsService {
   ): Promise<Notification> {
     return this.create({
       type: NotificationType.NEW_APPLICATION_SUBMITTED,
-      title: 'New Application Submitted',
-      message: `${applicantName} has submitted a new application: "${applicationTitle}"`,
+      title: '📋 New Application Submitted',
+      message: `${applicantName} has submitted a new application: "${applicationTitle}". Please review it when possible.`,
       userId: adminUserId,
       actionUrl: `/admin/applications/${applicationId}`,
       metadata: {
         applicationId,
         applicantName,
         applicationTitle,
+        submissionTime: new Date().toISOString(),
       },
     });
   }

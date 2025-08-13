@@ -31,27 +31,20 @@ export function NotificationBell() {
 
   const fetchUnreadCount = async () => {
     try {
-      console.log('📡 Fetching unread count...');
-      console.log('🔑 Auth token exists:', !!localStorage.getItem('auth_token'));
-      console.log('🌐 API URL:', process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001');
-      
       const count = await ApiClient.getUnreadCount();
-      console.log('✅ Unread count received:', count);
       setUnreadCount(count);
     } catch (error) {
-      console.error('❌ Failed to fetch unread count:', error);
+      console.error('Failed to fetch unread count:', error);
     }
   };
 
   const fetchNotifications = async () => {
     try {
-      console.log('📡 Fetching notifications...');
       setLoading(true);
       const response = await ApiClient.getNotifications(1, 10);
-      console.log('✅ Notifications received:', response);
       setNotifications(response.notifications);
     } catch (error) {
-      console.error('❌ Failed to fetch notifications:', error);
+      console.error('Failed to fetch notifications:', error);
       toast.error('Failed to load notifications');
     } finally {
       setLoading(false);

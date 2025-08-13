@@ -142,6 +142,7 @@ function SubmitContent() {
         teamMembers: formData.teamMembers.filter(member => member.trim()),
         githubRepo: formData.githubRepo.trim() || undefined,
         demoUrl: formData.demoUrl.trim() || undefined,
+        status: isDraft ? 'DRAFT' : 'SUBMITTED',
       };
 
       // Validate URLs if provided

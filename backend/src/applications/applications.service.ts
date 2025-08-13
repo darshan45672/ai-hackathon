@@ -12,9 +12,10 @@ export class ApplicationsService {
   ) {}
 
   async create(createApplicationDto: CreateApplicationDto, userId: string) {
-    return this.databaseService.application.create({
+    const application = await this.databaseService.application.create({
       data: {
         ...createApplicationDto,
+        status: createApplicationDto.status || 'DRAFT', // Default to DRAFT if not specified
         userId,
       },
       include: {
@@ -26,6 +27,33 @@ export class ApplicationsService {
         },
       },
     });
+
+    // If the application is submitted directly (not as draft), create notifications
+    if (application.status === 'SUBMITTED') {
+      // Notify the user about successful submission
+      await this.notificationsService.createApplicationStatusNotification(
+        application.id,
+        userId,
+        'SUBMITTED',
+      );
+
+      // Notify all admins about the new application
+      const admins = await this.databaseService.user.findMany({
+        where: { role: 'ADMIN' },
+        select: { id: true },
+      });
+
+      for (const admin of admins) {
+        await this.notificationsService.createNewApplicationNotification(
+          application.title,
+          application.user.name,
+          application.id,
+          admin.id,
+        );
+      }
+    }
+
+    return application;
   }
 
   async findAll(page: number = 1, limit: number = 10, status?: string) {
@@ -158,8 +186,10 @@ export class ApplicationsService {
       },
     });
 
-    // Create notification for the applicant if status changed
+    // Create notifications when status changes
     if (currentApplication.status !== status) {
+      // ALWAYS notify the applicant about status changes on their own application
+      // This ensures they get updates regardless of who made the change (admin or themselves)
       await this.notificationsService.createApplicationStatusNotification(
         id,
         currentApplication.userId,
@@ -167,8 +197,8 @@ export class ApplicationsService {
         adminUserId,
       );
 
-      // If a new application is submitted, notify all admins
-      if (status === 'SUBMITTED' && currentApplication.status === 'DRAFT') {
+      // If a new application is submitted by a user (DRAFT -> SUBMITTED), notify all admins
+      if (status === 'SUBMITTED' && currentApplication.status === 'DRAFT' && !adminUserId) {
         const admins = await this.databaseService.user.findMany({
           where: { role: 'ADMIN' },
           select: { id: true },
