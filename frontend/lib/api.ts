@@ -113,7 +113,7 @@ export class ApiClient {
   }
 
   // Admin-only methods
-  static async getAllApplications(page: number = 1, limit: number = 10, status?: string): Promise<ApplicationsResponse> {
+  static async getAllApplications(): Promise<ApplicationsResponse> {
     // Simplified approach - just fetch all applications without complex parameters
     const url = `/api/applications`;
     console.log('API Request URL (simplified):', `${API_BASE_URL}${url}`);

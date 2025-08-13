@@ -21,8 +21,7 @@ import {
   Mail,
   Code,
   Target,
-  Lightbulb,
-  Star
+  Lightbulb
 } from "lucide-react";
 import { Application } from "@/lib/api";
 import { toast } from "sonner";

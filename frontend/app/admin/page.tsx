@@ -50,26 +50,27 @@ function AdminDashboardContent() {
       // Always fetch all applications without status filter - let client-side handle filtering
       console.log('Fetching all applications (client-side filtering)');
       
-      const response = await ApiClient.getAllApplications(1, 100); // No status parameter
+      const response = await ApiClient.getAllApplications(); // No parameters needed
       console.log('Success! Received applications:', response.applications?.length || 0);
       setApplications(response.applications || []);
-    } catch (err: any) {
-      console.error('Failed to fetch applications:', err);
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error('Failed to fetch applications:', error);
       console.error('Error details:', {
-        message: err.message,
-        status: err.status,
-        response: err.response
+        message: error.message,
+        status: (error as { status?: number }).status,
+        response: (error as { response?: unknown }).response
       });
       
       // Handle specific error cases
-      if (err.message.includes('401') || err.message.includes('Unauthorized')) {
+      if (error.message.includes('401') || error.message.includes('Unauthorized')) {
         setError('Unauthorized: Please ensure you are logged in with admin privileges.');
         toast.error('Admin login required');
-      } else if (err.message.includes('403') || err.message.includes('Forbidden')) {
+      } else if (error.message.includes('403') || error.message.includes('Forbidden')) {
         setError('Access denied: Admin privileges required.');
         toast.error('Admin access required');
       } else {
-        setError(`Failed to load applications: ${err.message || 'Unknown error'}`);
+        setError(`Failed to load applications: ${error.message || 'Unknown error'}`);
         toast.error('Failed to load applications');
       }
     } finally {
@@ -81,7 +82,7 @@ function AdminDashboardContent() {
     try {
       setRefreshing(true);
       // Fetch all applications, filtering will be done client-side
-      const response = await ApiClient.getAllApplications(1, 100);
+      const response = await ApiClient.getAllApplications();
       setApplications(response.applications || []);
       toast.success('Applications refreshed');
     } catch (err) {

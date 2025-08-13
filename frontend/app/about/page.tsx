@@ -1,14 +1,12 @@
 import { Navigation } from "@/components/navigation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
   Trophy, 
-  Target, 
   Users, 
   Zap, 
   Calendar, 
-  Gift, 
   Brain,
   Rocket,
   Star,
@@ -16,7 +14,6 @@ import {
   Award,
   Lightbulb,
   Clock,
-  MapPin,
   ChevronRight,
   Sparkles,
   FileText
