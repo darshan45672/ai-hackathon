@@ -20,6 +20,8 @@ export function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [hasNewNotification, setHasNewNotification] = useState(false);
+  const [prevUnreadCount, setPrevUnreadCount] = useState(0);
   const router = useRouter();
 
   useEffect(() => {
@@ -29,9 +31,55 @@ export function NotificationBell() {
     }
   }, [isOpen]);
 
+  // Add real-time polling for notifications
+  useEffect(() => {
+    const pollInterval = setInterval(() => {
+      fetchUnreadCount();
+    }, 10000); // Poll every 10 seconds
+
+    return () => clearInterval(pollInterval);
+  }, []);
+
+  // Refresh notifications when the window gains focus (user comes back to the app)
+  useEffect(() => {
+    const handleFocus = () => {
+      fetchUnreadCount();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
+
   const fetchUnreadCount = async () => {
     try {
       const count = await ApiClient.getUnreadCount();
+      
+      // Check if there's a new notification (count increased)
+      if (count > prevUnreadCount && prevUnreadCount > 0) {
+        setHasNewNotification(true);
+        
+        // Show toast notification
+        toast.success("🔔 You have a new notification!", {
+          description: "Click the bell icon to view your notifications",
+          duration: 4000,
+        });
+        
+        // Play notification sound (optional)
+        try {
+          const audio = new Audio('/notification-sound.mp3');
+          audio.volume = 0.3;
+          audio.play().catch(() => {
+            // Ignore errors if sound can't play (browser restrictions)
+          });
+        } catch (error) {
+          // Ignore sound errors
+        }
+        
+        // Remove animation after 3 seconds
+        setTimeout(() => setHasNewNotification(false), 3000);
+      }
+      
+      setPrevUnreadCount(unreadCount);
       setUnreadCount(count);
     } catch (error) {
       console.error('Failed to fetch unread count:', error);
@@ -136,15 +184,28 @@ export function NotificationBell() {
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="relative h-9 w-9 p-0">
-          <Bell className="h-4 w-4" />
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className={`relative h-9 w-9 p-0 transition-all duration-300 ${
+            hasNewNotification ? 'animate-bounce' : ''
+          }`}
+        >
+          <Bell className={`h-4 w-4 transition-all duration-300 ${
+            hasNewNotification ? 'text-blue-600 animate-pulse' : ''
+          }`} />
           {unreadCount > 0 && (
             <Badge
               variant="destructive"
-              className="absolute -top-1 -right-1 h-5 w-5 p-0 text-xs"
+              className={`absolute -top-1 -right-1 h-5 w-5 p-0 text-xs transition-all duration-300 ${
+                hasNewNotification ? 'animate-ping scale-110' : ''
+              }`}
             >
               {unreadCount > 99 ? '99+' : unreadCount}
             </Badge>
+          )}
+          {hasNewNotification && (
+            <div className="absolute inset-0 rounded-full bg-blue-400 opacity-25 animate-ping"></div>
           )}
         </Button>
       </DropdownMenuTrigger>

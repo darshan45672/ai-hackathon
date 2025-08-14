@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards, Query, Param, Patch, Body } from '@nestjs/common';
+import { Controller, Get, UseGuards, Query, Param, Patch, Body, UnauthorizedException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { UsersService } from './users.service';
 import { UserResponseDto } from './dto/user-response.dto';
@@ -15,6 +15,9 @@ export class UsersController {
   @Get('me')
   async getCurrentUser(@CurrentUser() user: any) {
     const userData = await this.usersService.findById(user.id);
+    if (!userData) {
+      throw new UnauthorizedException('User not found. Please sign in again.');
+    }
     return new UserResponseDto(userData);
   }
 

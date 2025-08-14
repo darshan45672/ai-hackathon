@@ -144,9 +144,16 @@ export class ApplicationsService {
       throw new ForbiddenException('You can only update your own applications');
     }
 
-    return this.databaseService.application.update({
+    // Check if status is being updated
+    const isStatusUpdate = updateApplicationDto.status && updateApplicationDto.status !== application.status;
+    
+    // Update the application
+    const updatedApplication = await this.databaseService.application.update({
       where: { id },
-      data: updateApplicationDto,
+      data: {
+        ...updateApplicationDto,
+        submittedAt: updateApplicationDto.status === 'SUBMITTED' ? new Date() : application.submittedAt,
+      },
       include: {
         user: true,
         reviews: {
@@ -156,6 +163,36 @@ export class ApplicationsService {
         },
       },
     });
+
+    // If status changed, create notifications
+    if (isStatusUpdate && updateApplicationDto.status) {
+      // ALWAYS notify the applicant about status changes on their own application
+      await this.notificationsService.createApplicationStatusNotification(
+        id,
+        application.userId,
+        updateApplicationDto.status,
+        userRole === 'ADMIN' ? userId : undefined,
+      );
+
+      // If a draft application is being submitted by the user, notify all admins
+      if (updateApplicationDto.status === 'SUBMITTED' && application.status === 'DRAFT' && userRole !== 'ADMIN') {
+        const admins = await this.databaseService.user.findMany({
+          where: { role: 'ADMIN' },
+          select: { id: true },
+        });
+
+        for (const admin of admins) {
+          await this.notificationsService.createNewApplicationNotification(
+            application.title,
+            application.user.name,
+            id,
+            admin.id,
+          );
+        }
+      }
+    }
+
+    return updatedApplication;
   }
 
   async updateStatus(id: string, status: string, adminUserId?: string) {

@@ -4,23 +4,15 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Navigation } from "@/components/navigation";
 import { ProtectedRoute } from "@/components/protected-route";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { 
   ArrowLeft, 
-  FileText, 
-  Users, 
-  Code, 
   Globe, 
   Github, 
   ExternalLink, 
   Calendar,
-  Loader2,
-  AlertCircle,
-  CheckCircle,
-  Clock,
   XCircle
 } from "lucide-react";
 import Link from "next/link";
@@ -77,23 +69,6 @@ function ApplicationDetailContent() {
       fetchApplication();
     }
   }, [applicationId]);
-
-  const getStatusIcon = (status: string) => {
-    switch (status?.toUpperCase()) {
-      case "SUBMITTED":
-        return <CheckCircle className="h-5 w-5 text-green-500" />;
-      case "DRAFT":
-        return <Clock className="h-5 w-5 text-yellow-500" />;
-      case "APPROVED":
-        return <CheckCircle className="h-5 w-5 text-green-600" />;
-      case "REJECTED":
-        return <XCircle className="h-5 w-5 text-red-500" />;
-      case "UNDER_REVIEW":
-        return <AlertCircle className="h-5 w-5 text-blue-500" />;
-      default:
-        return <Clock className="h-5 w-5 text-gray-500" />;
-    }
-  };
 
   const getStatusColor = (status: string) => {
     switch (status?.toUpperCase()) {
@@ -352,7 +327,7 @@ function ApplicationDetailContent() {
             </Button>
             {application.status?.toUpperCase() === 'DRAFT' && (
               <Button asChild>
-                <Link href={`/submit?edit=${application.id}`}>
+                <Link href={`/applications/${application.id}/edit`}>
                   Continue Editing
                 </Link>
               </Button>

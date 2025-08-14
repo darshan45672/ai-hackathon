@@ -72,17 +72,68 @@ function SubmitContent() {
   };
 
   const addTeamMember = () => {
-    setFormData(prev => ({
-      ...prev,
-      teamMembers: [...prev.teamMembers, ""]
-    }));
+    const maxMembers = getMaxTeamMembers();
+    if (formData.teamMembers.length < maxMembers) {
+      setFormData(prev => ({
+        ...prev,
+        teamMembers: [...prev.teamMembers, ""]
+      }));
+    }
   };
 
   const removeTeamMember = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      teamMembers: prev.teamMembers.filter((_, i) => i !== index)
-    }));
+    const minMembers = getMinTeamMembers();
+    if (formData.teamMembers.length > minMembers && index > 0) {
+      setFormData(prev => ({
+        ...prev,
+        teamMembers: prev.teamMembers.filter((_, i) => i !== index)
+      }));
+    }
+  };
+
+  const getMinTeamMembers = () => {
+    const teamSize = parseInt(formData.teamSize) || 1;
+    return teamSize === 5 ? 5 : teamSize; // 5+ means minimum 5, others are exact
+  };
+
+  const getMaxTeamMembers = () => {
+    const teamSize = parseInt(formData.teamSize) || 1;
+    return teamSize === 5 ? 20 : teamSize; // 5+ allows up to 20 members, others are exact
+  };
+
+  const canAddMoreMembers = () => {
+    return formData.teamMembers.length < getMaxTeamMembers();
+  };
+
+  const canRemoveMembers = () => {
+    return formData.teamMembers.length > getMinTeamMembers() && formData.teamMembers.length > 1;
+  };
+
+  // Adjust team members when team size changes
+  const handleTeamSizeChange = (value: string) => {
+    const newTeamSize = parseInt(value) || 1;
+    const minMembers = newTeamSize === 5 ? 5 : newTeamSize;
+    
+    setFormData(prev => {
+      const currentMembers = prev.teamMembers.length;
+      let newTeamMembers = [...prev.teamMembers];
+      
+      // If new team size requires more members, add empty slots
+      if (currentMembers < minMembers) {
+        const membersToAdd = minMembers - currentMembers;
+        newTeamMembers = [...newTeamMembers, ...Array(membersToAdd).fill("")];
+      }
+      // If new team size requires fewer members, remove excess members
+      else if (currentMembers > newTeamSize && newTeamSize !== 5) {
+        newTeamMembers = newTeamMembers.slice(0, newTeamSize);
+      }
+      
+      return {
+        ...prev,
+        teamSize: value,
+        teamMembers: newTeamMembers
+      };
+    });
   };
 
   const updateTeamMember = (index: number, value: string) => {
@@ -97,35 +148,52 @@ function SubmitContent() {
   const handleSubmit = async (e: React.FormEvent, isDraft = false) => {
     e.preventDefault();
     
-    // Basic validation
-    if (!formData.title.trim()) {
-      toast.error("Please enter a project title");
-      return;
-    }
-    
-    if (!formData.description.trim()) {
-      toast.error("Please enter a project description");
-      return;
-    }
+    // Basic validation - only require for final submission, not drafts
+    if (!isDraft) {
+      if (!formData.title.trim()) {
+        toast.error("Please enter a project title");
+        return;
+      }
+      
+      if (!formData.description.trim()) {
+        toast.error("Please enter a project description");
+        return;
+      }
 
-    if (!formData.problemStatement.trim()) {
-      toast.error("Please enter a problem statement");
-      return;
-    }
+      if (!formData.problemStatement.trim()) {
+        toast.error("Please enter a problem statement");
+        return;
+      }
 
-    if (!formData.solution.trim()) {
-      toast.error("Please enter your proposed solution");
-      return;
-    }
+      if (!formData.solution.trim()) {
+        toast.error("Please enter your proposed solution");
+        return;
+      }
 
-    if (!formData.teamSize) {
-      toast.error("Please select team size");
-      return;
-    }
+      if (!formData.teamSize) {
+        toast.error("Please select team size");
+        return;
+      }
 
-    if (formData.teamMembers.some(member => !member.trim())) {
-      toast.error("Please fill in all team member names");
-      return;
+      const minMembers = getMinTeamMembers();
+      const filledMembers = formData.teamMembers.filter(member => member.trim());
+      
+      if (filledMembers.length < minMembers) {
+        const teamSizeText = parseInt(formData.teamSize) === 5 ? "at least 5" : formData.teamSize;
+        toast.error(`Please add ${teamSizeText} team members`);
+        return;
+      }
+
+      if (formData.teamMembers.some(member => member && !member.trim())) {
+        toast.error("Please fill in all team member names or remove empty fields");
+        return;
+      }
+    } else {
+      // For drafts, only require a title
+      if (!formData.title.trim()) {
+        toast.error("Please enter a project title to save as draft");
+        return;
+      }
     }
 
     setLoading(true);
@@ -134,11 +202,11 @@ function SubmitContent() {
       // Prepare data for submission
       const submissionData = {
         title: formData.title.trim(),
-        description: formData.description.trim(),
-        problemStatement: formData.problemStatement.trim(),
-        solution: formData.solution.trim(),
+        description: formData.description.trim() || undefined,
+        problemStatement: formData.problemStatement.trim() || undefined,
+        solution: formData.solution.trim() || undefined,
         techStack: formData.techStack,
-        teamSize: parseInt(formData.teamSize),
+        teamSize: formData.teamSize ? parseInt(formData.teamSize) : undefined,
         teamMembers: formData.teamMembers.filter(member => member.trim()),
         githubRepo: formData.githubRepo.trim() || undefined,
         demoUrl: formData.demoUrl.trim() || undefined,
@@ -158,7 +226,11 @@ function SubmitContent() {
 
       const application = await ApiClient.createApplication(submissionData);
       
-      toast.success(isDraft ? "Draft saved successfully!" : "Application submitted successfully!");
+      if (isDraft) {
+        toast.success("Draft saved successfully! You can continue editing later.");
+      } else {
+        toast.success("Application submitted successfully! Good luck with your project!");
+      }
       
       // Redirect to dashboard or application detail page
       router.push(`/applications/${application.id}`);
@@ -330,7 +402,10 @@ function SubmitContent() {
             <CardContent className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="teamSize">Team Size</Label>
-                <Select onValueChange={(value) => setFormData(prev => ({ ...prev, teamSize: value }))}>
+                <Select 
+                  value={formData.teamSize} 
+                  onValueChange={handleTeamSizeChange}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select team size" />
                   </SelectTrigger>
@@ -346,15 +421,23 @@ function SubmitContent() {
 
               <div className="space-y-2">
                 <Label>Team Members</Label>
+                {formData.teamSize && (
+                  <p className="text-sm text-muted-foreground">
+                    {parseInt(formData.teamSize) === 5 
+                      ? `Add at least 5 team members (you can add more if needed)`
+                      : `Add exactly ${formData.teamSize} team member${parseInt(formData.teamSize) > 1 ? 's' : ''}`
+                    }
+                  </p>
+                )}
                 <div className="space-y-2">
                   {formData.teamMembers.map((member, index) => (
                     <div key={index} className="flex gap-2">
                       <Input
-                        placeholder={index === 0 ? "Your name (team leader)" : "Team member name"}
+                        placeholder={index === 0 ? "Your name (team leader)" : `Team member ${index + 1} name`}
                         value={member}
                         onChange={(e) => updateTeamMember(index, e.target.value)}
                       />
-                      {index > 0 && (
+                      {index > 0 && canRemoveMembers() && (
                         <Button
                           type="button"
                           variant="outline"
@@ -366,15 +449,32 @@ function SubmitContent() {
                       )}
                     </div>
                   ))}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={addTeamMember}
-                    className="w-full"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Team Member
-                  </Button>
+                  {canAddMoreMembers() && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={addTeamMember}
+                      className="w-full"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Team Member
+                      {parseInt(formData.teamSize) === 5 && (
+                        <span className="ml-1 text-xs">
+                          ({formData.teamMembers.length}/∞)
+                        </span>
+                      )}
+                      {parseInt(formData.teamSize) !== 5 && formData.teamSize && (
+                        <span className="ml-1 text-xs">
+                          ({formData.teamMembers.length}/{formData.teamSize})
+                        </span>
+                      )}
+                    </Button>
+                  )}
+                  {!canAddMoreMembers() && parseInt(formData.teamSize) !== 5 && (
+                    <p className="text-sm text-muted-foreground text-center py-2">
+                      Maximum team members reached for selected team size
+                    </p>
+                  )}
                 </div>
               </div>
             </CardContent>
