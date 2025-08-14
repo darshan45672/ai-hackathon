@@ -120,4 +120,26 @@ export class ApplicationsController {
     await this.applicationsService.remove(id, user.id, user.role);
     return { message: 'Application deleted successfully' };
   }
+
+  @Post(':id/submit')
+  async submitApplication(@Param('id') id: string, @CurrentUser() user: any) {
+    const application = await this.applicationsService.submitApplication(id, user.id, user.role);
+    return new ApplicationResponseDto(application);
+  }
+
+  @Get(':id/ai-review-status')
+  async getAIReviewStatus(@Param('id') id: string, @CurrentUser() user: any) {
+    return await this.applicationsService.getAIReviewStatus(id, user.id, user.role);
+  }
+
+  @Post(':id/retry-ai-review/:reviewType')
+  @Roles('ADMIN')
+  @UseGuards(RolesGuard)
+  async retryAIReview(
+    @Param('id') id: string,
+    @Param('reviewType') reviewType: string,
+    @CurrentUser() user: any,
+  ) {
+    return await this.applicationsService.retryAIReview(id, reviewType, user.id, user.role);
+  }
 }

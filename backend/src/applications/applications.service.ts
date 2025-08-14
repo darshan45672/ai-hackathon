@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AIServiceClient } from './ai-service-client.service';
 import { CreateApplicationDto } from './dto/create-application.dto';
 import { UpdateApplicationDto } from './dto/update-application.dto';
 
@@ -9,6 +10,7 @@ export class ApplicationsService {
   constructor(
     private databaseService: DatabaseService,
     private notificationsService: NotificationsService,
+    private aiServiceClient: AIServiceClient,
   ) {}
 
   async create(createApplicationDto: CreateApplicationDto, userId: string) {
@@ -28,14 +30,25 @@ export class ApplicationsService {
       },
     });
 
-    // If the application is submitted directly (not as draft), create notifications
+    // If the application is submitted directly (not as draft), trigger AI review
     if (application.status === 'SUBMITTED') {
+      // Update submission timestamp
+      await this.databaseService.application.update({
+        where: { id: application.id },
+        data: { submittedAt: new Date() },
+      });
+
       // Notify the user about successful submission
       await this.notificationsService.createApplicationStatusNotification(
         application.id,
         userId,
         'SUBMITTED',
       );
+
+      // Trigger AI review process (async, don't wait for completion)
+      this.triggerAIReview(application.id).catch(error => {
+        console.error(`Failed to trigger AI review for application ${application.id}:`, error);
+      });
 
       // Notify all admins about the new application
       const admins = await this.databaseService.user.findMany({
@@ -265,5 +278,104 @@ export class ApplicationsService {
     return this.databaseService.application.delete({
       where: { id },
     });
+  }
+
+  // AI Review Integration Methods
+  private async triggerAIReview(applicationId: string): Promise<void> {
+    try {
+      await this.aiServiceClient.processApplicationReview(applicationId);
+    } catch (error) {
+      console.error(`Failed to trigger AI review for application ${applicationId}:`, error);
+      // Optionally, you could update the application status to indicate AI review failure
+      // or create a notification for admins
+    }
+  }
+
+  async getAIReviewStatus(applicationId: string, userId: string, userRole: string) {
+    // Check if user has permission to view this application
+    const application = await this.findOne(applicationId);
+    
+    if (application.userId !== userId && userRole !== 'ADMIN') {
+      throw new ForbiddenException('You can only view your own applications');
+    }
+
+    try {
+      return await this.aiServiceClient.getReviewStatus(applicationId);
+    } catch (error) {
+      throw new Error(`Failed to get AI review status: ${error.message}`);
+    }
+  }
+
+  async retryAIReview(applicationId: string, reviewType: string, userId: string, userRole: string) {
+    // Only admins can retry AI reviews
+    if (userRole !== 'ADMIN') {
+      throw new ForbiddenException('Only administrators can retry AI reviews');
+    }
+
+    try {
+      return await this.aiServiceClient.retryReview(applicationId, reviewType);
+    } catch (error) {
+      throw new Error(`Failed to retry AI review: ${error.message}`);
+    }
+  }
+
+  async submitApplication(applicationId: string, userId: string, userRole: string) {
+    const application = await this.findOne(applicationId);
+    
+    // Check if user owns the application
+    if (application.userId !== userId && userRole !== 'ADMIN') {
+      throw new ForbiddenException('You can only submit your own applications');
+    }
+
+    // Check if application is in DRAFT status
+    if (application.status !== 'DRAFT') {
+      throw new Error('Only draft applications can be submitted');
+    }
+
+    // Update status to SUBMITTED
+    const updatedApplication = await this.databaseService.application.update({
+      where: { id: applicationId },
+      data: {
+        status: 'SUBMITTED',
+        submittedAt: new Date(),
+      },
+      include: {
+        user: true,
+        reviews: {
+          include: {
+            reviewer: true,
+          },
+        },
+      },
+    });
+
+    // Notify the user about successful submission
+    await this.notificationsService.createApplicationStatusNotification(
+      applicationId,
+      userId,
+      'SUBMITTED',
+    );
+
+    // Trigger AI review process (async, don't wait for completion)
+    this.triggerAIReview(applicationId).catch(error => {
+      console.error(`Failed to trigger AI review for application ${applicationId}:`, error);
+    });
+
+    // Notify all admins about the new application
+    const admins = await this.databaseService.user.findMany({
+      where: { role: 'ADMIN' },
+      select: { id: true },
+    });
+
+    for (const admin of admins) {
+      await this.notificationsService.createNewApplicationNotification(
+        updatedApplication.title,
+        updatedApplication.user.name,
+        applicationId,
+        admin.id,
+      );
+    }
+
+    return updatedApplication;
   }
 }
