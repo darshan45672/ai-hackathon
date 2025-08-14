@@ -109,8 +109,9 @@ export class ApplicationsController {
   async updateStatus(
     @Param('id') id: string,
     @Body('status') status: string,
+    @CurrentUser() user: any,
   ) {
-    const application = await this.applicationsService.updateStatus(id, status);
+    const application = await this.applicationsService.updateStatus(id, status, user.id);
     return new ApplicationResponseDto(application);
   }
 

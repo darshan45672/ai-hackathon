@@ -8,7 +8,7 @@ COPY package*.json ./
 COPY prisma ./prisma/
 
 # Install dependencies
-RUN npm ci --only=production && npm cache clean --force
+RUN npm ci --only=production && npm install wait-on && npm cache clean --force
 
 # Generate Prisma client
 RUN npx prisma generate
@@ -22,8 +22,8 @@ RUN npm run build
 # Production stage
 FROM node:18-alpine AS production
 
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
+# Install dumb-init and curl for proper signal handling and health checks
+RUN apk add --no-cache dumb-init curl
 
 # Create app directory
 WORKDIR /app
@@ -32,13 +32,17 @@ WORKDIR /app
 RUN addgroup -g 1001 -S nodejs
 RUN adduser -S nestjs -u 1001
 
-# Copy built application
+# Copy built application and startup script
 COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/generated ./generated
 COPY --from=builder --chown=nestjs:nodejs /app/package*.json ./
+COPY --from=builder --chown=nestjs:nodejs /app/prisma ./prisma
+COPY --chown=nestjs:nodejs docker-entrypoint.sh ./
 
-# Switch to non-root user
+# Make the entrypoint script executable
+USER root
+RUN chmod +x docker-entrypoint.sh
 USER nestjs
 
 # Expose port
@@ -50,4 +54,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 
 # Start the application with dumb-init for proper signal handling
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "dist/main"]
+CMD ["./docker-entrypoint.sh", "node", "dist/main"]

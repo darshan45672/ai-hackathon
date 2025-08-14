@@ -29,6 +29,31 @@ interface ApplicationsResponse {
   currentPage: number;
 }
 
+interface Notification {
+  id: string;
+  type: 'APPLICATION_STATUS_CHANGE' | 'NEW_APPLICATION_SUBMITTED' | 'APPLICATION_REVIEW_ASSIGNED' | 'APPLICATION_REVIEW_COMPLETED' | 'SYSTEM_ANNOUNCEMENT' | 'DEADLINE_REMINDER';
+  title: string;
+  message: string;
+  read: boolean;
+  actionUrl?: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+  sender?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+}
+
+interface NotificationsResponse {
+  notifications: Notification[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export class ApiClient {
   private static getAuthToken(): string | null {
     if (typeof window === 'undefined') return null;
@@ -113,7 +138,7 @@ export class ApiClient {
   }
 
   // Admin-only methods
-  static async getAllApplications(page: number = 1, limit: number = 10, status?: string): Promise<ApplicationsResponse> {
+  static async getAllApplications(): Promise<ApplicationsResponse> {
     // Simplified approach - just fetch all applications without complex parameters
     const url = `/api/applications`;
     console.log('API Request URL (simplified):', `${API_BASE_URL}${url}`);
@@ -148,6 +173,46 @@ export class ApiClient {
     });
     return response.json();
   }
+
+  // Notification endpoints
+  static async getNotifications(page = 1, limit = 20, read?: boolean): Promise<NotificationsResponse> {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    
+    if (read !== undefined) {
+      params.append('read', read.toString());
+    }
+    
+    const response = await this.fetchWithAuth(`/api/notifications?${params}`);
+    return response.json();
+  }
+
+  static async getUnreadCount(): Promise<number> {
+    const response = await this.fetchWithAuth('/api/notifications/unread-count');
+    return response.json(); // Backend returns plain number
+  }
+
+  static async markNotificationAsRead(id: string): Promise<Notification> {
+    const response = await this.fetchWithAuth(`/api/notifications/${id}/mark-read`, {
+      method: 'POST',
+    });
+    return response.json();
+  }
+
+  static async markAllNotificationsAsRead(): Promise<{ count: number }> {
+    const response = await this.fetchWithAuth('/api/notifications/mark-all-read', {
+      method: 'POST',
+    });
+    return response.json();
+  }
+
+  static async deleteNotification(id: string): Promise<void> {
+    await this.fetchWithAuth(`/api/notifications/${id}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
-export type { Application, ApplicationsResponse };
+export type { Application, ApplicationsResponse, Notification, NotificationsResponse };

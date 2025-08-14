@@ -46,7 +46,7 @@ export default function SignUpPage() {
 
     try {
       const user = await register(formData.email, formData.password, formData.firstName, formData.lastName);
-      toast.success("Account created successfully! Welcome to AI Hackathon.");
+      toast.success("Account created successfully! Welcome to Hack-Ai thon.");
       
       // Redirect based on user role
       if (user.role === 'ADMIN') {
@@ -97,7 +97,7 @@ export default function SignUpPage() {
                   <Trophy className="h-10 w-10 text-primary-foreground" />
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold">AI Hackathon</h1>
+                  <h1 className="text-3xl font-bold">Hack-Ai thon</h1>
                   <p className="text-muted-foreground">Build the Future of AI</p>
                 </div>
               </div>

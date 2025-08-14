@@ -1,14 +1,12 @@
 import { Navigation } from "@/components/navigation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
   Trophy, 
-  Target, 
   Users, 
   Zap, 
   Calendar, 
-  Gift, 
   Brain,
   Rocket,
   Star,
@@ -16,7 +14,6 @@ import {
   Award,
   Lightbulb,
   Clock,
-  MapPin,
   ChevronRight,
   Sparkles,
   FileText
@@ -118,7 +115,7 @@ export default function AboutPage() {
               <div className="flex items-center justify-center mb-6">
                 <Badge variant="secondary" className="px-4 py-2 text-sm font-medium bg-primary/10 text-primary border-primary/20">
                   <Sparkles className="w-4 h-4 mr-2" />
-                  AI Hackathon 2025
+                  Hack-Ai thon 2025
                 </Badge>
               </div>
               
@@ -130,7 +127,7 @@ export default function AboutPage() {
               </h1>
               
               <p className="text-xl leading-relaxed text-muted-foreground max-w-2xl mx-auto mb-12">
-                Join the world's most innovative AI hackathon. Build revolutionary solutions, 
+                Join the world's most innovative Hack-Ai thon. Build revolutionary solutions, 
                 collaborate with brilliant minds, and compete for{" "}
                 <span className="font-semibold text-foreground">$50,000</span> in prizes.
               </p>

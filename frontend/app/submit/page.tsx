@@ -11,8 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Plus, X, FileText, Users, Code, Globe, Loader2 } from "lucide-react";
+import { Plus, X, FileText, Users, Code, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { ApiClient } from "@/lib/api";
 import { useAuth } from "@/contexts/auth-context";
@@ -143,6 +142,7 @@ function SubmitContent() {
         teamMembers: formData.teamMembers.filter(member => member.trim()),
         githubRepo: formData.githubRepo.trim() || undefined,
         demoUrl: formData.demoUrl.trim() || undefined,
+        status: isDraft ? 'DRAFT' : 'SUBMITTED',
       };
 
       // Validate URLs if provided

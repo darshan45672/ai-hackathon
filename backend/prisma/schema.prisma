@@ -23,6 +23,15 @@ enum ApplicationStatus {
   REJECTED
 }
 
+enum NotificationType {
+  APPLICATION_STATUS_CHANGE
+  NEW_APPLICATION_SUBMITTED
+  APPLICATION_REVIEW_ASSIGNED
+  APPLICATION_REVIEW_COMPLETED
+  SYSTEM_ANNOUNCEMENT
+  DEADLINE_REMINDER
+}
+
 model User {
   id         String   @id @default(cuid())
   email      String   @unique
@@ -40,6 +49,8 @@ model User {
   // Relations
   applications Application[]
   reviews      Review[]
+  notifications Notification[] @relation("UserNotifications")
+  sentNotifications Notification[] @relation("NotificationSender")
 
   @@map("users")
 }
@@ -83,4 +94,24 @@ model Review {
 
   @@unique([applicationId, reviewerId])
   @@map("reviews")
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+  type        NotificationType
+  title       String
+  message     String
+  read        Boolean          @default(false)
+  actionUrl   String?          // URL to navigate when notification is clicked
+  metadata    Json?            // Additional data (applicationId, etc.)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  // Relations
+  userId      String
+  user        User             @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+  senderId    String?          // Who triggered this notification (optional)
+  sender      User?            @relation("NotificationSender", fields: [senderId], references: [id], onDelete: SetNull)
+
+  @@map("notifications")
 }

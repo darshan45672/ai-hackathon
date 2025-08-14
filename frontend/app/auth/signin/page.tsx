@@ -73,7 +73,7 @@ export default function SignInPage() {
                   <Trophy className="h-10 w-10 text-primary-foreground" />
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold">AI Hackathon</h1>
+                  <h1 className="text-3xl font-bold">Hack-Ai thon</h1>
                   <p className="text-muted-foreground">Build the Future of AI</p>
                 </div>
               </div>

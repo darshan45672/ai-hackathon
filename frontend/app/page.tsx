@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Navigation } from "@/components/navigation";
 import { 
@@ -35,7 +35,7 @@ export default function HomePage() {
               <div className="flex items-center justify-center mb-6">
                 <Badge variant="secondary" className="px-4 py-2 text-sm font-medium bg-primary/10 text-primary border-primary/20">
                   <Sparkles className="w-4 h-4 mr-2" />
-                  AI Hackathon 2025 - Open Now
+                  Hack-Ai thon 2025 - Open Now
                 </Badge>
               </div>
               
@@ -48,7 +48,7 @@ export default function HomePage() {
               </h1>
               
               <p className="text-xl leading-relaxed text-muted-foreground max-w-2xl mx-auto mb-12">
-                Join the world's most innovative AI hackathon. Build revolutionary solutions, 
+                Join the world's most innovative Hack-Ai thon. Build revolutionary solutions, 
                 collaborate with brilliant minds, and compete for{" "}
                 <span className="font-semibold text-foreground">$50,000</span> in prizes.
               </p>
@@ -276,7 +276,7 @@ export default function HomePage() {
                 <div className="p-2 bg-gradient-to-br from-primary to-blue-600 rounded-xl">
                   <Trophy className="h-8 w-8 text-white" />
                 </div>
-                <span className="font-bold text-2xl">AI Hackathon</span>
+                <span className="font-bold text-2xl">Hack-Ai thon</span>
               </div>
               <p className="text-muted-foreground mb-4 max-w-md">
                 The premier platform for AI innovation and collaboration. 
@@ -335,7 +335,7 @@ export default function HomePage() {
 
           <div className="border-t pt-8 flex flex-col md:flex-row items-center justify-between">
             <p className="text-sm text-muted-foreground">
-              © 2025 AI Hackathon Platform. All rights reserved.
+              © 2025 Hack-Ai thon Platform. All rights reserved.
             </p>
             <div className="flex items-center gap-6 mt-4 md:mt-0">
               <Badge variant="outline" className="text-xs">
