@@ -39,6 +39,12 @@ export class AIReviewController {
     return { message: 'Review retry completed', applicationId: data.applicationId, reviewType: data.reviewType };
   }
 
+  @MessagePattern('get_application_feedback')
+  async handleGetApplicationFeedback(@Payload() data: { applicationId: string }) {
+    this.logger.log(`Received microservice request to get feedback for ${data.applicationId}`);
+    return await this.aiReviewOrchestratorService.getFeedbackForFrontend(data.applicationId);
+  }
+
   @Get('status/:applicationId')
   async getReviewStatus(@Param('applicationId') applicationId: string) {
     return await this.aiReviewOrchestratorService.getReviewStatus(applicationId);
@@ -47,6 +53,11 @@ export class AIReviewController {
   @Get('report/:applicationId')
   async getDetailedReport(@Param('applicationId') applicationId: string) {
     return await this.aiReviewOrchestratorService.getDetailedReviewReport(applicationId);
+  }
+
+  @Get('feedback/:applicationId')
+  async getFeedbackForFrontend(@Param('applicationId') applicationId: string) {
+    return await this.aiReviewOrchestratorService.getFeedbackForFrontend(applicationId);
   }
 
   @Post('retry/:applicationId/:reviewType')

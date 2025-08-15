@@ -9,6 +9,8 @@ import { CategorizationService } from './categorization.service';
 import { ImplementationReviewService } from './implementation-review.service';
 import { CostReviewService } from './cost-review.service';
 import { CustomerImpactReviewService } from './customer-impact-review.service';
+import { WebSocketClient } from '../websocket/websocket-client.service';
+import { MCPClientService } from '../mcp/mcp-client.service';
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { CustomerImpactReviewService } from './customer-impact-review.service';
     ImplementationReviewService,
     CostReviewService,
     CustomerImpactReviewService,
+    WebSocketClient,
+    MCPClientService,
   ],
   exports: [AIReviewOrchestratorService],
 })

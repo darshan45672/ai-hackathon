@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/commo
 import { DatabaseService } from '../database/database.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AIServiceClient } from './ai-service-client.service';
+import { ApplicationStatusGateway } from '../websocket/application-status.gateway';
 import { CreateApplicationDto } from './dto/create-application.dto';
 import { UpdateApplicationDto } from './dto/update-application.dto';
 
@@ -11,6 +12,7 @@ export class ApplicationsService {
     private databaseService: DatabaseService,
     private notificationsService: NotificationsService,
     private aiServiceClient: AIServiceClient,
+    private applicationStatusGateway: ApplicationStatusGateway,
   ) {}
 
   async create(createApplicationDto: CreateApplicationDto, userId: string) {
@@ -377,5 +379,42 @@ export class ApplicationsService {
     }
 
     return updatedApplication;
+  }
+
+  async getApplicationFeedback(applicationId: string, userId: string, userRole: string) {
+    // Check if user can access this application
+    const application = await this.databaseService.application.findUnique({
+      where: { id: applicationId },
+      include: { user: true },
+    });
+
+    if (!application) {
+      throw new NotFoundException('Application not found');
+    }
+
+    // Check permissions
+    if (userRole !== 'ADMIN' && application.userId !== userId) {
+      throw new ForbiddenException('You can only view feedback for your own applications');
+    }
+
+    try {
+      // Get detailed feedback from AI service
+      const feedback = await this.aiServiceClient.getApplicationFeedback(applicationId);
+      return feedback;
+    } catch (error) {
+      console.error(`Failed to get feedback for application ${applicationId}:`, error);
+      
+      // Fallback to basic information from database
+      return {
+        status: application.status === 'REJECTED' ? 'REJECTED' : 'IN_PROGRESS',
+        isRejected: application.status === 'REJECTED',
+        primaryReason: application.rejectionReason || 'Review in progress',
+        feedback: application.rejectionReason || 'Your application is being reviewed',
+        canResubmit: application.status === 'REJECTED',
+        nextSteps: application.status === 'REJECTED' 
+          ? ['Review the feedback', 'Make necessary changes', 'Resubmit your application']
+          : ['Wait for review completion'],
+      };
+    }
   }
 }

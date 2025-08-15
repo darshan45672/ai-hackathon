@@ -68,4 +68,21 @@ export class AIServiceClient implements OnModuleInit, OnModuleDestroy {
       throw error;
     }
   }
+
+  async getApplicationFeedback(applicationId: string): Promise<any> {
+    try {
+      this.logger.log(`Getting feedback from AI service for application ${applicationId}`);
+      
+      const result = await firstValueFrom(
+        this.client.send('get_application_feedback', { applicationId }).pipe(
+          timeout(30000) // 30 seconds timeout
+        )
+      );
+      
+      return result;
+    } catch (error) {
+      this.logger.error(`Error getting feedback from AI service for application ${applicationId}:`, error);
+      throw error;
+    }
+  }
 }

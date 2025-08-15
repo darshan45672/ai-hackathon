@@ -321,4 +321,160 @@ export class AIReviewOrchestratorService {
       },
     };
   }
+
+  /**
+   * Get user-friendly feedback specifically for frontend display
+   */
+  async getFeedbackForFrontend(applicationId: string): Promise<any> {
+    try {
+      const application = await this.databaseService.application.findUnique({
+        where: { id: applicationId },
+        include: {
+          aiReviews: {
+            orderBy: { createdAt: 'desc' },
+          },
+        },
+      });
+
+      if (!application) {
+        throw new Error(`Application ${applicationId} not found`);
+      }
+
+      // Find the rejection review (if any)
+      const rejectedReview = application.aiReviews.find(review => review.result === 'REJECTED');
+      
+      if (!rejectedReview) {
+        return {
+          status: 'SUCCESS',
+          message: 'Your application has passed all AI review stages!',
+          currentStage: application.status,
+          isRejected: false,
+        };
+      }
+
+      // Parse metadata for detailed feedback
+      const metadata = rejectedReview.metadata as any;
+      
+      const response = {
+        status: 'REJECTED',
+        isRejected: true,
+        rejectionStage: rejectedReview.type,
+        primaryReason: this.getPrimaryRejectionReason(rejectedReview.type),
+        feedback: rejectedReview.feedback,
+        score: rejectedReview.score,
+        reviewedAt: rejectedReview.processedAt,
+        details: {
+          similarityScore: metadata?.similarityScore,
+          foundSources: metadata?.foundSources || [],
+          suggestions: metadata?.suggestions || [],
+          rejectionReason: metadata?.rejectionReason,
+        },
+        nextSteps: this.getNextStepsForRejection(rejectedReview.type),
+        canResubmit: true,
+        resubmissionGuidelines: this.getResubmissionGuidelines(rejectedReview.type),
+      };
+
+      return response;
+    } catch (error) {
+      this.logger.error(`Error getting feedback for frontend for application ${applicationId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get primary rejection reason in user-friendly language
+   */
+  private getPrimaryRejectionReason(reviewType: string): string {
+    switch (reviewType) {
+      case 'EXTERNAL_IDEA':
+        return 'Similar Idea Already Exists';
+      case 'INTERNAL_IDEA':
+        return 'Duplicate Submission Detected';
+      case 'CATEGORIZATION':
+        return 'Unable to Categorize Application';
+      case 'IMPLEMENTATION':
+        return 'Implementation Not Feasible';
+      case 'COST':
+        return 'Budget Insufficient';
+      case 'IMPACT':
+        return 'Low Market Impact Potential';
+      default:
+        return 'Application Review Failed';
+    }
+  }
+
+  /**
+   * Get next steps based on rejection type
+   */
+  private getNextStepsForRejection(reviewType: string): string[] {
+    const commonSteps = [
+      'Review the detailed feedback provided',
+      'Consider the suggestions for improvement',
+      'Make significant changes to address the concerns',
+      'Resubmit your application when ready',
+    ];
+
+    const specificSteps: { [key: string]: string[] } = {
+      EXTERNAL_IDEA: [
+        'Research existing solutions more thoroughly',
+        'Identify unique differentiators for your approach',
+        'Consider targeting a different market segment',
+        'Focus on specific features that competitors lack',
+      ],
+      INTERNAL_IDEA: [
+        'Check if you submitted a similar application before',
+        'Collaborate with the existing team if appropriate',
+        'Focus on a completely different problem or solution',
+      ],
+      IMPLEMENTATION: [
+        'Simplify your technical approach',
+        'Consider using more mature technologies',
+        'Strengthen your team with additional expertise',
+        'Break down the project into smaller phases',
+      ],
+      COST: [
+        'Reduce the scope to fit within budget',
+        'Find additional funding sources',
+        'Use more cost-effective technologies',
+        'Consider open-source alternatives',
+      ],
+      IMPACT: [
+        'Better quantify the problem you\'re solving',
+        'Provide more evidence of market demand',
+        'Focus on a specific target audience',
+        'Highlight the unique value proposition',
+      ],
+    };
+
+    return [...commonSteps, ...(specificSteps[reviewType] || [])];
+  }
+
+  /**
+   * Get resubmission guidelines
+   */
+  private getResubmissionGuidelines(reviewType: string): string[] {
+    const guidelines = [
+      'Wait at least 24 hours before resubmitting',
+      'Address all points mentioned in the feedback',
+      'Provide clear explanations of what you changed',
+      'Include additional evidence or research if requested',
+    ];
+
+    const specificGuidelines: { [key: string]: string[] } = {
+      EXTERNAL_IDEA: [
+        'Demonstrate clear differentiation from existing solutions',
+        'Provide market research showing demand for your unique approach',
+      ],
+      IMPLEMENTATION: [
+        'Include a more detailed technical plan',
+        'Show evidence of team capability improvements',
+      ],
+      COST: [
+        'Provide a revised, more realistic budget breakdown',
+        'Show additional funding sources if budget increased',
+      ],
+    };
+
+    return [...guidelines, ...(specificGuidelines[reviewType] || [])];
+  }
 }
