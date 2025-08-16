@@ -28,6 +28,16 @@ export class ExternalIdeaReviewService {
     this.logger.log(`Starting external idea review for application ${applicationId}`);
 
     try {
+      // Ensure WebSocket connection is established before starting review
+      this.logger.log('Ensuring WebSocket connection before starting review...');
+      await this.webSocketClient.ensureConnection();
+      
+      if (!this.webSocketClient.isConnected()) {
+        this.logger.warn('WebSocket connection could not be established, proceeding without real-time updates');
+      } else {
+        this.logger.log('WebSocket connection confirmed, proceeding with review');
+      }
+
       const application = await this.databaseService.application.findUnique({
         where: { id: applicationId },
         include: { user: true },
@@ -38,7 +48,7 @@ export class ExternalIdeaReviewService {
       }
 
       // Send real-time update: Review started
-      this.webSocketClient.sendAIReviewProgress(
+      await this.webSocketClient.sendAIReviewProgress(
         applicationId,
         'EXTERNAL_IDEA',
         'STARTED',
@@ -106,7 +116,7 @@ export class ExternalIdeaReviewService {
         });
 
         // Send real-time rejection update with Gemini analysis
-        this.webSocketClient.sendApplicationRejection(applicationId, {
+        await this.webSocketClient.sendApplicationRejection(applicationId, {
           userId: application.userId,
           rejectionStage: 'EXTERNAL_IDEA',
           primaryReason: 'AI Detected Similar Startup in Y Combinator',
@@ -143,7 +153,7 @@ export class ExternalIdeaReviewService {
         });
 
         // Send real-time update: Moving to next stage
-        this.webSocketClient.sendAIReviewProgress(
+        await this.webSocketClient.sendAIReviewProgress(
           applicationId,
           'EXTERNAL_IDEA',
           'APPROVED',
@@ -182,7 +192,7 @@ export class ExternalIdeaReviewService {
       this.logger.log('Starting Gemini AI analysis via MCP...');
       
       // Send real-time update
-      this.webSocketClient.sendAIReviewProgress(
+      await this.webSocketClient.sendAIReviewProgress(
         '', // Will be set by caller if needed
         'EXTERNAL_IDEA',
         'IN_PROGRESS',
@@ -198,7 +208,7 @@ export class ExternalIdeaReviewService {
       this.logger.log(`Fetched ${ycCompanies.length} YC companies for analysis`);
       
       // Send real-time update
-      this.webSocketClient.sendAIReviewProgress(
+      await this.webSocketClient.sendAIReviewProgress(
         '', // Will be set by caller if needed
         'EXTERNAL_IDEA',
         'IN_PROGRESS',

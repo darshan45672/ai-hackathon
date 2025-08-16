@@ -57,6 +57,34 @@ function DashboardContent() {
     fetchApplications();
   }, []);
 
+  // Listen for real-time application updates via WebSocket
+  useEffect(() => {
+    const handleApplicationUpdate = (event: CustomEvent) => {
+      console.log('Dashboard received application update:', event.detail);
+      
+      // Refresh applications list to show latest status
+      fetchApplications();
+    };
+
+    const handleAIReviewProgress = (event: CustomEvent) => {
+      console.log('Dashboard received AI review progress:', event.detail);
+      
+      // Refresh applications list to show latest AI review status
+      fetchApplications();
+    };
+
+    // Add event listeners for WebSocket events
+    window.addEventListener('application-status-updated', handleApplicationUpdate as EventListener);
+    window.addEventListener('application-rejected', handleApplicationUpdate as EventListener);
+    window.addEventListener('ai-review-progress', handleAIReviewProgress as EventListener);
+
+    return () => {
+      window.removeEventListener('application-status-updated', handleApplicationUpdate as EventListener);
+      window.removeEventListener('application-rejected', handleApplicationUpdate as EventListener);
+      window.removeEventListener('ai-review-progress', handleAIReviewProgress as EventListener);
+    };
+  }, []);
+
   const getStatusIcon = (status: string) => {
     switch (status?.toUpperCase()) {
       case "SUBMITTED":

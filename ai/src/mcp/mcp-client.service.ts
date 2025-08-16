@@ -89,10 +89,11 @@ export class MCPClientService {
     }
   }
 
-  async fetchYCCompanies(category?: string, limit: number = 50): Promise<any[]> {
+  async fetchYCCompanies(category?: string, limit?: number): Promise<any[]> {
     try {
       this.logger.log('Fetching YC companies from MCP server');
       
+      // For similarity analysis, we want ALL companies - don't set any limit
       const mcpRequest = {
         jsonrpc: '2.0',
         id: Date.now(),
@@ -101,7 +102,9 @@ export class MCPClientService {
           name: 'fetch_yc_companies',
           arguments: {
             category,
-            limit
+            forSimilarityAnalysis: true, // This ensures we get all companies
+            // Don't include limit for similarity analysis
+            ...(limit && limit > 0 ? { limit } : {}),
           }
         }
       };
