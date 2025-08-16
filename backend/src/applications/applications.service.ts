@@ -302,7 +302,43 @@ export class ApplicationsService {
     }
 
     try {
-      return await this.aiServiceClient.getReviewStatus(applicationId);
+      // Fetch AI reviews from database
+      const aiReviews = await this.databaseService.aIReview.findMany({
+        where: { applicationId },
+        orderBy: { createdAt: 'asc' }
+      });
+
+      // Try to get live status from AI service
+      let aiServiceStatus = null;
+      try {
+        aiServiceStatus = await this.aiServiceClient.getReviewStatus(applicationId);
+      } catch (aiServiceError) {
+        console.log('Could not get live AI service status:', aiServiceError.message);
+      }
+
+      // Map AI reviews to timeline format
+      const timeline = aiReviews.map(review => ({
+        id: review.id,
+        type: review.type,
+        stage: review.type,
+        result: review.result,
+        status: review.result,
+        score: review.score,
+        feedback: review.feedback,
+        processedAt: review.processedAt,
+        createdAt: review.createdAt,
+        updatedAt: review.updatedAt,
+        metadata: review.metadata,
+        errorMessage: review.errorMessage
+      }));
+
+      return {
+        applicationId,
+        applicationStatus: application.status,
+        stages: timeline,
+        liveStatus: aiServiceStatus,
+        lastUpdated: new Date().toISOString()
+      };
     } catch (error) {
       throw new Error(`Failed to get AI review status: ${error.message}`);
     }
