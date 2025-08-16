@@ -50,6 +50,44 @@ export function NotificationBell() {
     return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
+  // Listen for real-time notifications via WebSocket
+  useEffect(() => {
+    const handleNewNotification = (event: CustomEvent) => {
+      console.log('Notification bell received new notification:', event.detail);
+      
+      // Update unread count
+      setUnreadCount(prev => prev + 1);
+      setHasNewNotification(true);
+      
+      // If notifications dropdown is open, refresh the list
+      if (isOpen) {
+        fetchNotifications();
+      }
+      
+      // Remove animation after 3 seconds
+      setTimeout(() => setHasNewNotification(false), 3000);
+    };
+
+    const handleApplicationStatusUpdate = () => {
+      // Refresh notifications when application status changes
+      if (isOpen) {
+        fetchNotifications();
+      }
+      fetchUnreadCount();
+    };
+
+    // Add event listeners for WebSocket events
+    window.addEventListener('new-notification', handleNewNotification as EventListener);
+    window.addEventListener('application-status-updated', handleApplicationStatusUpdate);
+    window.addEventListener('application-rejected', handleApplicationStatusUpdate);
+
+    return () => {
+      window.removeEventListener('new-notification', handleNewNotification as EventListener);
+      window.removeEventListener('application-status-updated', handleApplicationStatusUpdate);
+      window.removeEventListener('application-rejected', handleApplicationStatusUpdate);
+    };
+  }, [isOpen]);
+
   const fetchUnreadCount = async () => {
     try {
       const count = await ApiClient.getUnreadCount();

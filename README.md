@@ -1,6 +1,6 @@
-# Hack-Ai thon Application
+# Hack-AI-thon Application
 
-A scalable web application built with NestJS backend and Next.js frontend, deployed using Docker with load balancing and monitoring.
+A scalable web application built with NestJS backend, AI microservice, and Next.js frontend, deployed using Docker with load balancing and monitoring. Features automated AI-powered application reviews.
 
 ## 🚀 Quick Start
 
@@ -40,10 +40,37 @@ A scalable web application built with NestJS backend and Next.js frontend, deplo
 4. **Access the Application**
    - **Frontend**: http://localhost:80
    - **Backend API**: http://localhost:80/api
+   - **AI Service**: http://localhost:3002 (HTTP) / 3003 (microservice)
    - **Grafana Dashboard**: http://localhost:3000 (admin/admin)
    - **Prometheus Metrics**: http://localhost:9090
    - **Redis**: localhost:6379
    - **PostgreSQL**: localhost:5432
+
+## 🚀 New: AI-Powered Application Reviews
+
+### Automated Review Pipeline
+
+When users submit applications, they now go through an automated AI review process:
+
+1. **External Idea Review**: Checks if similar ideas exist on Product Hunt, Y Combinator, etc.
+2. **Internal Idea Review**: Compares with other submissions to avoid duplicates
+3. **Categorization**: Automatically assigns applications to relevant categories
+4. **Implementation Feasibility**: Evaluates technical complexity and feasibility
+5. **Cost Analysis**: Reviews if requested budget is sufficient for implementation
+6. **Customer Impact**: Assesses market potential and business viability
+
+### Review States
+
+Applications now progress through these states:
+- `DRAFT` → `SUBMITTED` → `EXTERNAL_IDEA_REVIEW` → `INTERNAL_IDEA_REVIEW` → `CATEGORIZATION` → `IMPLEMENTATION_REVIEW` → `COST_REVIEW` → `IMPACT_REVIEW` → `UNDER_REVIEW` or `REJECTED`
+
+### AI Service Features
+
+- **Microservice Architecture**: Independent AI service for scalability
+- **Real-time Processing**: Background processing with status tracking
+- **Detailed Analytics**: Comprehensive review reports with scoring
+- **Retry Mechanism**: Ability to retry failed review steps
+- **Admin Controls**: Admin interface for review management
 
 ## 🏗️ Architecture
 
