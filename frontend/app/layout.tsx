@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/contexts/auth-context";
+import { WebSocketProvider } from "@/contexts/websocket-context";
 import { Toaster } from "@/components/ui/sonner";
 
 const geistSans = Geist({
@@ -35,8 +36,10 @@ export default function RootLayout({
           storageKey="hackathon-ui-theme"
         >
           <AuthProvider>
-            {children}
-            <Toaster />
+            <WebSocketProvider>
+              {children}
+              <Toaster />
+            </WebSocketProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

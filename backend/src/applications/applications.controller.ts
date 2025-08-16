@@ -132,6 +132,11 @@ export class ApplicationsController {
     return await this.applicationsService.getAIReviewStatus(id, user.id, user.role);
   }
 
+  @Get(':id/feedback')
+  async getApplicationFeedback(@Param('id') id: string, @CurrentUser() user: any) {
+    return await this.applicationsService.getApplicationFeedback(id, user.id, user.role);
+  }
+
   @Post(':id/retry-ai-review/:reviewType')
   @Roles('ADMIN')
   @UseGuards(RolesGuard)

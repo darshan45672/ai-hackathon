@@ -8,6 +8,7 @@ import { UsersModule } from './users/users.module';
 import { ApplicationsModule } from './applications/applications.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { WebSocketModule } from './websocket/websocket.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     ApplicationsModule,
     ReviewsModule,
     NotificationsModule,
+    WebSocketModule,
   ],
   controllers: [AppController],
   providers: [AppService],

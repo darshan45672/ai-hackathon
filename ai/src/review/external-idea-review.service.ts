@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { DatabaseService } from '../database/database.service';
+import { WebSocketClient } from '../websocket/websocket-client.service';
+import { MCPClientService, MCPAnalysisResult } from '../mcp/mcp-client.service';
 
 export interface ExternalSourceResult {
   found: boolean;
@@ -18,19 +20,43 @@ export class ExternalIdeaReviewService {
   constructor(
     private readonly httpService: HttpService,
     private readonly databaseService: DatabaseService,
+    private readonly webSocketClient: WebSocketClient,
+    private readonly mcpClient: MCPClientService,
   ) {}
 
   async reviewIdea(applicationId: string): Promise<void> {
     this.logger.log(`Starting external idea review for application ${applicationId}`);
 
     try {
+      // Ensure WebSocket connection is established before starting review
+      this.logger.log('Ensuring WebSocket connection before starting review...');
+      await this.webSocketClient.ensureConnection();
+      
+      if (!this.webSocketClient.isConnected()) {
+        this.logger.warn('WebSocket connection could not be established, proceeding without real-time updates');
+      } else {
+        this.logger.log('WebSocket connection confirmed, proceeding with review');
+      }
+
       const application = await this.databaseService.application.findUnique({
         where: { id: applicationId },
+        include: { user: true },
       });
 
       if (!application) {
         throw new Error(`Application ${applicationId} not found`);
       }
+
+      // Send real-time update: Review started
+      await this.webSocketClient.sendAIReviewProgress(
+        applicationId,
+        'EXTERNAL_IDEA',
+        'STARTED',
+        { 
+          message: 'Starting AI-powered similarity analysis...',
+          details: `Using Gemini AI to analyze "${application.title}" against Y Combinator portfolio`
+        }
+      );
 
       // Create AI review record
       const aiReview = await this.databaseService.aIReview.create({
@@ -41,26 +67,33 @@ export class ExternalIdeaReviewService {
         },
       });
 
-      // Check external sources
-      const results = await Promise.all([
-        this.checkProductHunt(application.title, application.description),
-        this.checkYCombinator(application.title, application.description),
-        this.checkGeneralWeb(application.title, application.description),
-      ]);
-
-      const foundInExternal = results.some(result => result.found);
+      // Use MCP + Gemini for intelligent analysis
+      const analysisResult = await this.analyzeWithGeminiAI(application.title, application.description);
+      
+      const foundInExternal = analysisResult.isSimilar;
       
       let feedback = '';
       let metadata = {
-        productHunt: JSON.parse(JSON.stringify(results[0])),
-        yCombinator: JSON.parse(JSON.stringify(results[1])),
-        webSearch: JSON.parse(JSON.stringify(results[2])),
+        geminiAnalysis: JSON.parse(JSON.stringify(analysisResult)),
+        analysisMethod: 'MCP_GEMINI_AI',
       };
 
       if (foundInExternal) {
-        const foundSources = results.filter(r => r.found);
-        feedback = `Similar idea found in external sources: ${foundSources.map(s => s.source).join(', ')}. `;
-        feedback += foundSources.map(s => s.details).join(' ');
+        const similarityScore = analysisResult.similarityScore;
+        
+        // Use Gemini's feedback directly
+        feedback = analysisResult.feedback;
+        
+        // Enhanced metadata with Gemini insights
+        const enhancedMetadata = {
+          geminiAnalysis: JSON.parse(JSON.stringify(analysisResult)),
+          rejectionReason: 'SIMILAR_IDEA_EXISTS_YC',
+          similarityScore,
+          suggestions: analysisResult.suggestions || [],
+          mostSimilarCompany: analysisResult.mostSimilarCompany || null,
+          analysisMethod: 'MCP_GEMINI_AI',
+          aiRecommendation: analysisResult.recommendation
+        };
         
         // Update AI review and application status
         await this.databaseService.aIReview.update({
@@ -68,9 +101,9 @@ export class ExternalIdeaReviewService {
           data: {
             result: 'REJECTED',
             feedback,
-            metadata,
+            metadata: enhancedMetadata,
             processedAt: new Date(),
-            score: foundSources.reduce((acc, s) => Math.max(acc, s.similarity || 0), 0),
+            score: similarityScore,
           },
         });
 
@@ -81,8 +114,24 @@ export class ExternalIdeaReviewService {
             rejectionReason: feedback,
           },
         });
+
+        // Send real-time rejection update with Gemini analysis
+        await this.webSocketClient.sendApplicationRejection(applicationId, {
+          userId: application.userId,
+          rejectionStage: 'EXTERNAL_IDEA',
+          primaryReason: 'AI Detected Similar Startup in Y Combinator',
+          feedback,
+          score: similarityScore,
+          details: {
+            similarityScore,
+            mostSimilarCompany: analysisResult.mostSimilarCompany,
+            suggestions: analysisResult.suggestions || [],
+            rejectionReason: 'SIMILAR_IDEA_EXISTS_YC',
+            aiAnalysis: analysisResult.analysis,
+          },
+        });
       } else {
-        feedback = 'No similar ideas found in external sources. Proceeding to internal review.';
+        feedback = 'Gemini AI analysis found no significant similarity to existing Y Combinator companies. Proceeding to internal review.';
         
         await this.databaseService.aIReview.update({
           where: { id: aiReview.id },
@@ -91,7 +140,7 @@ export class ExternalIdeaReviewService {
             feedback,
             metadata,
             processedAt: new Date(),
-            score: 0.9, // High confidence for not found
+            score: 0.9, // High confidence for approved
           },
         });
 
@@ -102,6 +151,18 @@ export class ExternalIdeaReviewService {
             status: 'INTERNAL_IDEA_REVIEW',
           },
         });
+
+        // Send real-time update: Moving to next stage
+        await this.webSocketClient.sendAIReviewProgress(
+          applicationId,
+          'EXTERNAL_IDEA',
+          'APPROVED',
+          { 
+            message: 'Gemini AI found no similar ideas in Y Combinator. Moving to internal review...',
+            nextStage: 'INTERNAL_IDEA_REVIEW',
+            aiConfidence: analysisResult.similarityScore
+          }
+        );
       }
 
       this.logger.log(`External idea review completed for application ${applicationId}: ${foundInExternal ? 'REJECTED' : 'APPROVED'}`);
@@ -123,77 +184,74 @@ export class ExternalIdeaReviewService {
     }
   }
 
-  private async checkProductHunt(title: string, description: string): Promise<ExternalSourceResult> {
+  /**
+   * Analyze idea similarity using MCP + Gemini AI
+   */
+  private async analyzeWithGeminiAI(title: string, description: string): Promise<MCPAnalysisResult> {
     try {
-      // Simulate Product Hunt API check
-      // In real implementation, you would use Product Hunt API
-      this.logger.log('Checking Product Hunt for similar ideas...');
+      this.logger.log('Starting Gemini AI analysis via MCP...');
       
-      // Mock implementation - replace with actual API call
-      const searchQuery = encodeURIComponent(title);
-      const mockSimilarity = Math.random();
+      // Send real-time update
+      await this.webSocketClient.sendAIReviewProgress(
+        '', // Will be set by caller if needed
+        'EXTERNAL_IDEA',
+        'IN_PROGRESS',
+        { 
+          message: 'Fetching Y Combinator companies...',
+          details: 'Preparing data for Gemini AI analysis'
+        }
+      );
+
+      // Fetch YC companies data via MCP
+      const ycCompanies = await this.mcpClient.fetchYCCompanies();
       
-      if (mockSimilarity > 0.7) {
-        return {
-          found: true,
-          source: 'Product Hunt',
-          similarity: mockSimilarity,
-          details: `Found similar product on Product Hunt with ${Math.round(mockSimilarity * 100)}% similarity.`,
-        };
+      this.logger.log(`Fetched ${ycCompanies.length} YC companies for analysis`);
+      
+      // Send real-time update
+      await this.webSocketClient.sendAIReviewProgress(
+        '', // Will be set by caller if needed
+        'EXTERNAL_IDEA',
+        'IN_PROGRESS',
+        { 
+          message: 'Analyzing with Gemini AI...',
+          details: `Comparing against ${ycCompanies.length} Y Combinator companies`
+        }
+      );
+
+      // Prepare user application data
+      const userApplication = {
+        title,
+        description,
+        targetMarket: 'Not specified', // Could be extracted from application in future
+        businessModel: 'Not specified'
+      };
+
+      // Call MCP server with Gemini AI analysis
+      const analysisResult = await this.mcpClient.analyzeIdeaSimilarity(
+        userApplication,
+        ycCompanies
+      );
+      
+      this.logger.log(`Gemini analysis completed: ${analysisResult.recommendation} (similarity: ${analysisResult.similarityScore})`);
+      
+      if (analysisResult.mostSimilarCompany) {
+        this.logger.log(`Most similar company: ${analysisResult.mostSimilarCompany.name} - ${analysisResult.mostSimilarCompany.reason}`);
       }
 
-      return { found: false, source: 'Product Hunt' };
+      return analysisResult;
+
     } catch (error) {
-      this.logger.error('Error checking Product Hunt:', error);
-      return { found: false, source: 'Product Hunt' };
-    }
-  }
-
-  private async checkYCombinator(title: string, description: string): Promise<ExternalSourceResult> {
-    try {
-      // Simulate Y Combinator startup database check
-      this.logger.log('Checking Y Combinator database for similar ideas...');
+      this.logger.error('Error in Gemini AI analysis:', error);
       
-      // Mock implementation - replace with actual scraping or API
-      const mockSimilarity = Math.random();
-      
-      if (mockSimilarity > 0.75) {
-        return {
-          found: true,
-          source: 'Y Combinator',
-          similarity: mockSimilarity,
-          details: `Found similar startup in Y Combinator portfolio with ${Math.round(mockSimilarity * 100)}% similarity.`,
-        };
-      }
-
-      return { found: false, source: 'Y Combinator' };
-    } catch (error) {
-      this.logger.error('Error checking Y Combinator:', error);
-      return { found: false, source: 'Y Combinator' };
-    }
-  }
-
-  private async checkGeneralWeb(title: string, description: string): Promise<ExternalSourceResult> {
-    try {
-      // Simulate general web search for similar products/services
-      this.logger.log('Performing general web search for similar ideas...');
-      
-      // Mock implementation - replace with actual search API (Google, Bing, etc.)
-      const mockSimilarity = Math.random();
-      
-      if (mockSimilarity > 0.8) {
-        return {
-          found: true,
-          source: 'Web Search',
-          similarity: mockSimilarity,
-          details: `Found similar product/service on the web with ${Math.round(mockSimilarity * 100)}% similarity.`,
-        };
-      }
-
-      return { found: false, source: 'Web Search' };
-    } catch (error) {
-      this.logger.error('Error in web search:', error);
-      return { found: false, source: 'Web Search' };
+      // Return safe fallback
+      return {
+        isSimilar: false,
+        similarityScore: 0,
+        recommendation: 'APPROVE',
+        feedback: 'Unable to complete AI analysis due to technical issues. Application approved for manual review.',
+        error: true,
+        message: error.message
+      };
     }
   }
 }
