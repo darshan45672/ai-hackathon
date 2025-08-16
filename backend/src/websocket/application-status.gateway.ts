@@ -10,6 +10,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { Logger, UseGuards } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @WebSocketGateway({
   cors: {
@@ -24,10 +25,28 @@ export class ApplicationStatusGateway implements OnGatewayConnection, OnGatewayD
   private readonly logger = new Logger(ApplicationStatusGateway.name);
   private userSockets = new Map<string, string>(); // userId -> socketId
 
-  constructor(private jwtService: JwtService) {}
+  constructor(
+    private jwtService: JwtService,
+    private notificationsService: NotificationsService,
+  ) {}
 
   async handleConnection(client: Socket) {
     try {
+      // Check if this is an AI service connection
+      const isAIService = client.handshake.auth.service === 'ai-service' || 
+                         client.handshake.query.source === 'ai-service';
+      
+      if (isAIService) {
+        this.logger.log('AI service connected via WebSocket');
+        client.data.isAIService = true;
+        client.data.userId = 'ai-service';
+        
+        // Join AI service to global room for broadcasting
+        client.join('ai-service');
+        return;
+      }
+
+      // Regular user authentication
       const token = client.handshake.auth.token || client.handshake.headers.authorization?.split(' ')[1];
       
       if (!token) {
@@ -42,6 +61,7 @@ export class ApplicationStatusGateway implements OnGatewayConnection, OnGatewayD
       // Store user's socket connection
       this.userSockets.set(userId, client.id);
       client.data.userId = userId;
+      client.data.isAIService = false;
 
       this.logger.log(`User ${userId} connected via WebSocket`);
 
@@ -55,7 +75,9 @@ export class ApplicationStatusGateway implements OnGatewayConnection, OnGatewayD
   }
 
   handleDisconnect(client: Socket) {
-    if (client.data.userId) {
+    if (client.data.isAIService) {
+      this.logger.log('AI service disconnected from WebSocket');
+    } else if (client.data.userId) {
       this.userSockets.delete(client.data.userId);
       this.logger.log(`User ${client.data.userId} disconnected from WebSocket`);
     }
@@ -102,8 +124,37 @@ export class ApplicationStatusGateway implements OnGatewayConnection, OnGatewayD
   }
 
   @SubscribeMessage('ai-service-rejection')
-  handleAIServiceRejection(@MessageBody() data: any) {
+  async handleAIServiceRejection(@MessageBody() data: any) {
     this.logger.log(`Received AI service rejection:`, data);
+    
+    // Create notification in database
+    if (data.userId) {
+      try {
+        const notification = await this.notificationsService.create({
+          userId: data.userId,
+          type: 'APPLICATION_STATUS_CHANGE',
+          title: 'Application Rejected by AI Review',
+          message: `Your application "${data.feedback || 'has been rejected'}" by our AI review system. ${data.details?.aiAnalysis || 'Please review the feedback and consider resubmitting with improvements.'}`,
+          metadata: {
+            applicationId: data.applicationId,
+            rejectionStage: data.rejectionStage,
+            primaryReason: data.primaryReason,
+            score: data.score,
+            details: data.details,
+          },
+        });
+
+        // Send notification via WebSocket
+        this.server.to(`user:${data.userId}`).emit('new-notification', {
+          notification,
+          timestamp: new Date().toISOString(),
+        });
+
+        this.logger.log(`Created notification for user ${data.userId} - application ${data.applicationId} rejected`);
+      } catch (error) {
+        this.logger.error('Failed to create notification for AI rejection:', error);
+      }
+    }
     
     // Send rejection details to user
     if (data.userId) {
