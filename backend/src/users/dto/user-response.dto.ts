@@ -7,6 +7,9 @@ export class UserResponseDto {
   createdAt: Date;
   
   constructor(user: any) {
+    if (!user) {
+      throw new Error('User not found');
+    }
     this.id = user.id;
     this.email = user.email;
     this.name = user.name;

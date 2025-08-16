@@ -137,6 +137,11 @@ export class ApiClient {
     });
   }
 
+  static async getAIReviewStatus(id: string): Promise<any> {
+    const response = await this.fetchWithAuth(`/api/applications/${id}/ai-review-status`);
+    return response.json();
+  }
+
   // Admin-only methods
   static async getAllApplications(): Promise<ApplicationsResponse> {
     // Simplified approach - just fetch all applications without complex parameters

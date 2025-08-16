@@ -1,23 +1,131 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# AI Review Service
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+This is the AI-powered application review microservice for the hackathon platform. It automatically evaluates submitted applications through multiple review stages.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
+## Features
+
+### Automated Review Pipeline
+
+The AI service processes applications through the following stages:
+
+1. **External Idea Review** - Checks if the idea already exists on platforms like Product Hunt and Y Combinator
+2. **Internal Idea Review** - Compares with other submitted applications to avoid duplicates
+3. **Categorization** - Automatically classifies applications into relevant categories
+4. **Implementation Feasibility** - Reviews technical feasibility and implementation complexity
+5. **Cost Analysis** - Evaluates if the requested budget is sufficient for implementation
+6. **Customer Impact Review** - Assesses market potential and business viability
+
+### Review States
+
+Applications move through these states during AI review:
+- `SUBMITTED` → `EXTERNAL_IDEA_REVIEW` → `INTERNAL_IDEA_REVIEW` → `CATEGORIZATION` → `IMPLEMENTATION_REVIEW` → `COST_REVIEW` → `IMPACT_REVIEW` → `UNDER_REVIEW` (manual review) or `REJECTED`
+
+## Architecture
+
+- **Microservice Design**: Runs independently from the main backend
+- **TCP Communication**: Uses NestJS microservices for inter-service communication
+- **Database Integration**: Shares the same database as the main application
+- **Asynchronous Processing**: Reviews are processed in the background
+
+## API Endpoints
+
+### HTTP Endpoints (for testing)
+- `POST /ai-review/process/:applicationId` - Manually trigger review process
+- `GET /ai-review/status/:applicationId` - Get review status and progress
+- `GET /ai-review/report/:applicationId` - Get detailed review report
+- `POST /ai-review/retry/:applicationId/:reviewType` - Retry a failed review step
+- `GET /ai-review/health` - Health check
+
+### Microservice Patterns
+- `process_application_review` - Triggered when application is submitted
+- `get_review_status` - Get current review status
+- `retry_review` - Retry a specific review step
+
+## Environment Variables
+
+```env
+DATABASE_URL=postgresql://...
+PORT=3002
+NODE_ENV=development
+```
+
+## Installation & Setup
+
+1. Install dependencies:
+```bash
+npm install
+```
+
+2. Set up environment variables in `.env`
+
+3. Generate Prisma client:
+```bash
+npx prisma generate
+```
+
+4. Start the service:
+```bash
+npm run start:dev
+```
+
+The AI service will run on port 3002 (HTTP) and 3003 (microservice).
+
+## Integration with Backend
+
+The main backend automatically triggers AI reviews when applications are submitted:
+
+1. User submits application → Backend updates status to `SUBMITTED`
+2. Backend sends message to AI service via TCP microservice
+3. AI service processes application through review pipeline
+4. Each stage updates application status and creates AI review records
+5. Final result is either `UNDER_REVIEW` (for manual review) or `REJECTED`
+
+## Review Logic
+
+### External Idea Review
+- Simulates checking Product Hunt, Y Combinator, and web search
+- Rejects applications with >70% similarity to existing products
+
+### Internal Idea Review
+- Compares with other applications in the database
+- Uses text similarity algorithms (Jaccard similarity, Levenshtein distance)
+- Rejects applications with >80% similarity to existing submissions
+
+### Categorization
+- Analyzes application content using keyword matching
+- Assigns categories like E-Commerce, Healthcare, Education, etc.
+- Uses confidence scoring for category assignment
+
+### Implementation Feasibility
+- Evaluates technical complexity based on tech stack and description
+- Assesses team capability based on team size and experience
+- Considers timeframe and resource requirements
+- Rejects if overall feasibility score < 60%
+
+### Cost Analysis
+- Estimates development, infrastructure, third-party, and operational costs
+- Compares with requested budget
+- Rejects if budget is insufficient (>20% shortfall)
+
+### Customer Impact Review
+- Analyzes problem severity and market size
+- Evaluates solution novelty and business viability
+- Assesses user experience potential
+- Rejects if overall impact score < 60%
+
+## Monitoring
+
+- All review stages are logged with detailed information
+- Review metadata is stored in the database for analysis
+- Failed reviews include error messages for debugging
+
+## Future Enhancements
+
+- Integration with real external APIs (Product Hunt, Y Combinator)
+- Machine learning models for better text analysis
+- Sentiment analysis for application quality assessment
+- Real-time progress notifications
+- A/B testing for review criteria optimization
   <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
   [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
 

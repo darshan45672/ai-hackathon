@@ -7,7 +7,6 @@ import { ProtectedRoute } from "@/components/protected-route";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Bell, 
@@ -15,7 +14,6 @@ import {
   CheckCircle2, 
   Trash2, 
   RefreshCw,
-  Filter,
   Calendar,
   AlertCircle,
   FileText,
@@ -28,7 +26,7 @@ import {
   Loader2
 } from "lucide-react";
 import Link from "next/link";
-import { ApiClient, type Notification, type NotificationsResponse } from "@/lib/api";
+import { ApiClient, type Notification } from "@/lib/api";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/auth-context";
 
@@ -179,7 +177,7 @@ function NotificationsContent() {
   const handleMarkAllAsRead = async () => {
     try {
       setLoading(true);
-      const response = await ApiClient.markAllNotificationsAsRead();
+      await ApiClient.markAllNotificationsAsRead();
       
       // Update all notifications to read in local state
       setAllNotifications(prev => 
@@ -422,7 +420,7 @@ function NotificationsContent() {
                     </div>
                   ) : paginatedNotifications.length > 0 ? (
                     <div className="space-y-4">
-                      {paginatedNotifications.map((notification, index) => (
+                      {paginatedNotifications.map((notification) => (
                         <div
                           key={notification.id}
                           className={`flex items-start gap-4 p-4 rounded-lg border transition-colors ${
