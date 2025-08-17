@@ -45,12 +45,14 @@ class ExternalReviewMCPServer {
                 userApplication: {
                   type: 'object',
                   properties: {
-                    title: { type: 'string' },
-                    description: { type: 'string' },
-                    targetMarket: { type: 'string' },
-                    businessModel: { type: 'string' }
+                    title: { type: 'string', description: 'The name/title of the startup/project' },
+                    description: { type: 'string', description: 'Overall description of the startup' },
+                    problemStatement: { type: 'string', description: 'The specific problem this startup is solving' },
+                    proposedSolution: { type: 'string', description: 'How the startup plans to solve the problem' },
+                    targetMarket: { type: 'string', description: 'Target customer base or market segment' },
+                    businessModel: { type: 'string', description: 'How the startup plans to make money' }
                   },
-                  required: ['title', 'description']
+                  required: ['title', 'description', 'problemStatement', 'proposedSolution']
                 },
                 externalData: {
                   type: 'object',
@@ -133,11 +135,15 @@ class ExternalReviewMCPServer {
       
       // Create comprehensive prompt for Gemini
       const prompt = `
-You are an expert startup analyst. Analyze if the user's startup idea is too similar to existing Y Combinator companies.
+You are an expert startup analyst evaluating if a user's startup idea is too similar to existing Y Combinator companies.
+
+Your task is to determine if the idea should be REJECTED or APPROVED based on these specific criteria:
 
 USER APPLICATION:
 Title: ${userApplication.title}
 Description: ${userApplication.description}
+Problem Statement: ${userApplication.problemStatement}
+Proposed Solution: ${userApplication.proposedSolution}
 Target Market: ${userApplication.targetMarket || 'Not specified'}
 Business Model: ${userApplication.businessModel || 'Not specified'}
 
@@ -150,14 +156,22 @@ ${externalData.ycCompanies.map(company => `
   Tags: ${company.tags?.join(', ') || 'None'}
 `).join('\n')}
 
-ANALYSIS CRITERIA:
-1. Core business model similarity
-2. Target market overlap
-3. Value proposition similarity
-4. Technology approach similarity
-5. Market timing and positioning
+REJECTION CRITERIA (Reject if ANY of these apply):
+1. SAME/SIMILAR NAME + SAME/SIMILAR PROBLEM: Title name and description/problem are same or very similar
+2. DIFFERENT NAME BUT SAME CONCEPT: Title is different but problem statement, business model, or approach is same or very similar
 
-IMPORTANT: Focus on the fundamental business concept, not just naming or surface-level similarities. Two companies can have different names but solve the same problem in the same way.
+APPROVAL CRITERIA (Approve if ANY of these apply):
+1. TOTALLY UNIQUE: Title name and description/problem are solving a NEW problem not listed in Y Combinator
+2. DIFFERENT APPROACH: Idea exists in Y Combinator but the way they're addressing it is totally different and unique
+
+ANALYSIS FRAMEWORK:
+- Compare TITLE similarity (exact names, variations, synonyms)
+- Compare PROBLEM STATEMENTS (what core problem is being solved)
+- Compare PROPOSED SOLUTIONS (how they solve the problem)
+- Compare BUSINESS MODELS (how they make money)
+- Consider TARGET MARKETS (who they serve)
+
+Focus on CORE BUSINESS CONCEPT and EXECUTION APPROACH, not just industry overlap.
 
 Please provide a JSON response with:
 {
@@ -165,20 +179,20 @@ Please provide a JSON response with:
   "similarityScore": number (0-1),
   "mostSimilarCompany": {
     "name": "string",
-    "reason": "string"
+    "reason": "string explaining the similarity"
   },
   "analysis": {
-    "businessModelSimilarity": "string",
-    "targetMarketOverlap": "string",
-    "valuePropSimilarity": "string",
-    "differentiationPotential": "string"
+    "titleSimilarity": "analysis of name/title similarity",
+    "problemSimilarity": "analysis of problem statement similarity", 
+    "solutionSimilarity": "analysis of proposed solution similarity",
+    "businessModelSimilarity": "analysis of business model similarity"
   },
-  "recommendation": "APPROVE" | "REJECT" | "NEEDS_DIFFERENTIATION",
-  "feedback": "detailed feedback for the applicant",
-  "suggestions": ["array of specific suggestions"]
+  "recommendation": "APPROVE" | "REJECT",
+  "feedback": "detailed feedback explaining the decision",
+  "suggestions": ["array of suggestions for improvement if rejected"]
 }
 
-Be strict but fair. Reject only if there's significant overlap in core business model AND target market.
+Be precise and thorough in your analysis.
 `;
 
       // Call Gemini AI
@@ -216,314 +230,122 @@ Be strict but fair. Reject only if there's significant overlap in core business 
 
   /**
    * Fallback similarity analysis when Gemini API is not available
+   * Implements precise business logic for startup idea similarity detection
    */
   fallbackSimilarityAnalysis(userApplication, ycCompanies) {
     try {
       const userTitle = userApplication.title.toLowerCase();
       const userDesc = userApplication.description.toLowerCase();
-      
-      let mostSimilarCompany = null;
-      let highestSimilarity = 0;
-      let allSimilarCompanies = [];
-      let exactNameMatch = null;
+      const userProblem = (userApplication.problemStatement || '').toLowerCase();
+      const userSolution = (userApplication.proposedSolution || '').toLowerCase();
       
       console.log(`🔍 Analyzing similarity against ${ycCompanies.length} companies...`);
+      console.log(`📋 User Application: "${userApplication.title}"`);
+      console.log(`📝 Problem: "${userApplication.problemStatement}"`);
+      console.log(`💡 Solution: "${userApplication.proposedSolution}"`);
       
-      // First pass: Check for exact name matches
+      // Step 1: Check for name similarity
+      console.log('\n🎯 Step 1: Checking name similarity...');
       for (const company of ycCompanies) {
         const companyName = company.name.toLowerCase();
         const formerNames = (company.formerNames || []).map(name => name.toLowerCase());
         const allNames = [companyName, ...formerNames];
         
-        // Check for exact name matches first
         for (const name of allNames) {
           const nameSimilarity = this.calculateStringSimilarity(userTitle, name);
-          if (userTitle.includes(name) || name.includes(userTitle) || nameSimilarity > 0.8) {
-            const isFormerName = formerNames.includes(name);
-            exactNameMatch = {
-              company,
-              similarity: 0.95,
-              isFormerName,
-              matchedName: name,
-              nameSimilarity
-            };
-            console.log(`🎯 Exact name match found: ${company.name} (similarity: ${nameSimilarity})`);
-            break;
+          const normalizedUserTitle = userTitle.replace(/[^a-z0-9]/g, '');
+          const normalizedCompanyName = name.replace(/[^a-z0-9]/g, '');
+          
+          // Name match criteria: high similarity OR exact match OR containment
+          const isHighSimilarity = nameSimilarity > 0.85;
+          const isExactMatch = normalizedUserTitle === normalizedCompanyName;
+          const isContainedMatch = (normalizedUserTitle.length > 3 && normalizedCompanyName.includes(normalizedUserTitle)) ||
+                                  (normalizedCompanyName.length > 3 && normalizedUserTitle.includes(normalizedCompanyName));
+          
+          if (isHighSimilarity || isExactMatch || isContainedMatch) {
+            console.log(`❌ NAME MATCH FOUND: ${company.name} (similarity: ${Math.round(nameSimilarity * 100)}%)`);
+            
+            // Check if problem/description is also similar
+            const problemSimilarity = this.calculateBusinessConceptSimilarity(
+              userDesc + ' ' + userProblem,
+              (company.oneLiner || '') + ' ' + (company.description || '')
+            );
+            
+            console.log(`📊 Problem similarity: ${Math.round(problemSimilarity * 100)}%`);
+            
+            // For exact name matches, reject if problem similarity is >10% (very low threshold)
+            // For high similarity names, reject if problem similarity is >30%
+            const rejectionThreshold = (isExactMatch || nameSimilarity > 0.95) ? 0.1 : 0.3;
+            
+            if (problemSimilarity > rejectionThreshold) {
+              return this.createRejectionResponse(company, 'NAME_AND_PROBLEM_MATCH', {
+                nameSimilarity: Math.round(nameSimilarity * 100),
+                problemSimilarity: Math.round(problemSimilarity * 100),
+                reason: `Same/similar name "${userApplication.title}" matches "${company.name}" AND the problem/description is also similar (${Math.round(problemSimilarity * 100)}% similarity).`
+              }, userApplication);
+            }
           }
         }
-        if (exactNameMatch) break;
       }
       
-      // If we found an exact name match, return it immediately
-      if (exactNameMatch) {
-        const { company, isFormerName, matchedName } = exactNameMatch;
-        const nameType = isFormerName ? `former name "${matchedName}"` : `company name "${company.name}"`;
-        
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                isSimilar: true,
-                similarityScore: 0.95,
-                mostSimilarCompany: {
-                  name: company.name,
-                  reason: `Direct name match detected. Your application title "${userApplication.title}" matches the existing Y Combinator company's ${nameType}.`
-                },
-                analysis: {
-                  businessModelSimilarity: "Exact match - same company name",
-                  targetMarketOverlap: "Complete overlap",
-                  valuePropSimilarity: "Identical value proposition",
-                  differentiationPotential: "Very low - direct competitor"
-                },
-                recommendation: "REJECT",
-                feedback: `Your application appears to be for "${company.name}" (${isFormerName ? `formerly known as "${matchedName}"` : ''}), which is already a successful Y Combinator company (${company.oneLiner}). This company was founded in ${company.founded || 'unknown'} and operates in the ${company.industry} industry. To proceed, you would need to demonstrate a significantly different approach or target market.`,
-                suggestions: [
-                  `Research ${company.name}'s current limitations and identify unaddressed market segments`,
-                  "Consider targeting a different geographic market or customer segment",
-                  "Develop unique technology or business model differentiators",
-                  "Focus on specific industry verticals the existing company doesn't serve",
-                  "Consider a B2B vs B2C pivot or vice versa"
-                ]
-              }, null, 2)
-            }
-          ]
-        };
-      }
+      console.log('✅ No significant name matches found. Proceeding to business concept analysis...');
       
-      // Second pass: Calculate content similarity for ALL companies
-      console.log(`📊 No exact name match found. Analyzing content similarity for all ${ycCompanies.length} companies...`);
+      // Step 2: Check for business concept similarity (different name but same concept)
+      console.log('\n🧠 Step 2: Analyzing business concept similarity...');
+      
+      let highestSimilarity = 0;
+      let mostSimilarCompany = null;
+      let similarityDetails = null;
       
       for (let i = 0; i < ycCompanies.length; i++) {
         const company = ycCompanies[i];
         
-        if (i % 1000 === 0) {
+        if (i % 500 === 0) {
           console.log(`📈 Progress: ${i}/${ycCompanies.length} companies analyzed`);
         }
         
-        const companyName = company.name.toLowerCase();
-        const companyOneLiner = (company.oneLiner || '').toLowerCase();
-        const companyDesc = (company.description || '').toLowerCase();
+        // Analyze different aspects of business similarity
+        const analysis = this.analyzeBusinessSimilarity(userApplication, company);
         
-        // Calculate content-based similarity for descriptions
-        const userWords = new Set(userDesc.split(/\s+/).filter(word => word.length > 3));
-        const companyWords = new Set((companyOneLiner + ' ' + companyDesc).split(/\s+/).filter(word => word.length > 3));
+        // Calculate overall business concept similarity
+        const overallSimilarity = this.calculateOverallBusinessSimilarity(analysis);
         
-        const intersection = new Set([...userWords].filter(word => companyWords.has(word)));
-        const union = new Set([...userWords, ...companyWords]);
-        const jaccardSimilarity = intersection.size > 0 ? intersection.size / union.size : 0;
-        
-        // Enhanced business model keyword matching
-        const businessKeywords = [
-          'marketplace', 'platform', 'delivery', 'payment', 'manufacturing', 'electronics', 'robotics',
-          'fraud', 'detection', 'analytics', 'ai', 'artificial intelligence', 'fintech', 'ecommerce',
-          'e-commerce', 'saas', 'software', 'app', 'mobile', 'web', 'api', 'dashboard', 'payments',
-          'security', 'machine learning', 'automation', 'blockchain', 'crypto', 'cryptocurrency'
-        ];
-        
-        let keywordMatches = 0;
-        let totalKeywords = 0;
-        let matchedKeywords = [];
-        
-        for (const keyword of businessKeywords) {
-          const userHasKeyword = userDesc.includes(keyword);
-          const companyHasKeyword = companyOneLiner.includes(keyword) || companyDesc.includes(keyword);
-          
-          if (userHasKeyword || companyHasKeyword) {
-            totalKeywords++;
-            if (userHasKeyword && companyHasKeyword) {
-              keywordMatches++;
-              matchedKeywords.push(keyword);
-            }
-          }
-        }
-        
-        const keywordSimilarity = totalKeywords > 0 ? keywordMatches / totalKeywords : 0;
-        
-        // Check tag similarity
-        const userTags = [...userWords].filter(word => 
-          ['ai', 'analytics', 'payment', 'fraud', 'detection', 'fintech', 'ecommerce', 'payments', 'security'].includes(word)
-        );
-        const companyTags = (company.tags || []).map(tag => tag.toLowerCase());
-        
-        let tagMatches = 0;
-        let matchedTags = [];
-        for (const userTag of userTags) {
-          for (const companyTag of companyTags) {
-            if (companyTag.includes(userTag) || userTag.includes(companyTag.replace(/\s+/g, ''))) {
-              tagMatches++;
-              matchedTags.push(companyTag);
-              break;
-            }
-          }
-        }
-        
-        const tagSimilarity = userTags.length > 0 ? tagMatches / userTags.length : 0;
-        
-        // Industry similarity
-        const userIndustryWords = [...userWords].filter(word => 
-          ['fintech', 'financial', 'healthcare', 'education', 'retail', 'manufacturing', 'logistics'].includes(word)
-        );
-        const companyIndustry = (company.industry || '').toLowerCase();
-        const companySubindustry = (company.subindustry || '').toLowerCase();
-        
-        let industrySimilarity = 0;
-        for (const word of userIndustryWords) {
-          if (companyIndustry.includes(word) || companySubindustry.includes(word)) {
-            industrySimilarity = 0.5;
-            break;
-          }
-        }
-        
-        // Weighted overall similarity - giving more weight to keywords and tags
-        const overallSimilarity = (jaccardSimilarity * 0.3) + (keywordSimilarity * 0.4) + (tagSimilarity * 0.2) + (industrySimilarity * 0.1);
-        
-        // Store this company's similarity data
-        if (overallSimilarity > 0.1) { // Only store companies with some similarity
-          allSimilarCompanies.push({
-            company,
-            similarity: overallSimilarity,
-            details: {
-              jaccardSimilarity,
-              keywordSimilarity,
-              tagSimilarity,
-              industrySimilarity,
-              matchedKeywords,
-              matchedTags,
-              commonWords: [...intersection].slice(0, 5)
-            }
-          });
-        }
-        
-        // Track the highest similarity
         if (overallSimilarity > highestSimilarity) {
           highestSimilarity = overallSimilarity;
-          mostSimilarCompany = {
-            name: company.name,
-            similarity: overallSimilarity,
-            reason: `Business model similarity detected. Shared concepts: ${[...intersection].slice(0, 3).join(', ')}. Matched keywords: ${matchedKeywords.slice(0, 3).join(', ')}. Matched tags: ${matchedTags.slice(0, 3).join(', ')}. Overall similarity: ${Math.round(overallSimilarity * 100)}%`,
-            details: {
-              jaccardSimilarity,
-              keywordSimilarity,
-              tagSimilarity,
-              industrySimilarity,
-              matchedKeywords,
-              matchedTags
-            }
-          };
+          mostSimilarCompany = company;
+          similarityDetails = analysis;
         }
       }
       
-      // Sort all similar companies by similarity score
-      allSimilarCompanies.sort((a, b) => b.similarity - a.similarity);
+      console.log(`🎯 Analysis complete. Highest business similarity: ${Math.round(highestSimilarity * 100)}% with ${mostSimilarCompany?.name || 'no company'}`);
       
-      console.log(`🎯 Analysis complete. Highest similarity: ${Math.round(highestSimilarity * 100)}% with ${mostSimilarCompany?.name || 'no company'}`);
-      console.log(`📊 Found ${allSimilarCompanies.length} companies with similarity > 10%`);
+      // Step 3: Make decision based on business concept similarity
+      // Reject if business concept similarity is high (>40%)
+      const businessConceptThreshold = 0.4;
       
-      if (allSimilarCompanies.length > 0) {
-        const top5 = allSimilarCompanies.slice(0, 5);
-        console.log(`🏆 Top 5 similar companies:`);
-        top5.forEach((item, index) => {
-          console.log(`   ${index + 1}. ${item.company.name}: ${Math.round(item.similarity * 100)}%`);
-        });
+      if (highestSimilarity > businessConceptThreshold && mostSimilarCompany) {
+        console.log(`❌ REJECTING: Business concept too similar (${Math.round(highestSimilarity * 100)}%) to ${mostSimilarCompany.name}`);
+        
+        return this.createRejectionResponse(mostSimilarCompany, 'BUSINESS_CONCEPT_MATCH', {
+          overallSimilarity: Math.round(highestSimilarity * 100),
+          problemSimilarity: Math.round(similarityDetails.problemSimilarity * 100),
+          solutionSimilarity: Math.round(similarityDetails.solutionSimilarity * 100),
+          businessModelSimilarity: Math.round(similarityDetails.businessModelSimilarity * 100),
+          reason: `Different name but same/similar business concept. Your problem statement, solution approach, or business model is too similar to ${mostSimilarCompany.name}.`
+        }, userApplication);
       }
       
-      // Decision threshold - more strict for rejection
-      const isRejected = highestSimilarity > 0.4; // Adjusted threshold
+      // Approve - sufficiently unique
+      console.log(`✅ APPROVING: Idea is sufficiently unique (${Math.round(highestSimilarity * 100)}% max similarity)`);
       
-      if (isRejected && mostSimilarCompany) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                isSimilar: true,
-                similarityScore: highestSimilarity,
-                mostSimilarCompany: {
-                  name: mostSimilarCompany.name,
-                  reason: mostSimilarCompany.reason
-                },
-                analysis: {
-                  businessModelSimilarity: `${Math.round(highestSimilarity * 100)}% similarity in core business approach`,
-                  targetMarketOverlap: "Significant overlap detected in target market",
-                  valuePropSimilarity: "Similar value propositions identified",
-                  differentiationPotential: "Moderate - requires clear differentiation strategy",
-                  detailedBreakdown: {
-                    conceptSimilarity: `${Math.round(mostSimilarCompany.details.jaccardSimilarity * 100)}%`,
-                    keywordMatches: mostSimilarCompany.details.matchedKeywords,
-                    tagMatches: mostSimilarCompany.details.matchedTags,
-                    totalSimilarCompanies: allSimilarCompanies.length
-                  }
-                },
-                recommendation: "REJECT",
-                feedback: `Your startup idea shows significant similarity (${Math.round(highestSimilarity * 100)}%) to ${mostSimilarCompany.name}, an existing Y Combinator company. ${mostSimilarCompany.reason} To improve your application, focus on clear differentiation and unique market positioning.`,
-                suggestions: [
-                  `Study ${mostSimilarCompany.name}'s approach and identify gaps in their solution`,
-                  "Define your unique value proposition more clearly",
-                  "Target underserved market segments or geographies",
-                  "Develop proprietary technology or methodology",
-                  "Consider partnerships or integration opportunities"
-                ],
-                allSimilarCompanies: allSimilarCompanies.slice(0, 5).map(item => ({
-                  name: item.company.name,
-                  similarity: Math.round(item.similarity * 100),
-                  industry: item.company.industry,
-                  batch: item.company.batch
-                }))
-              }, null, 2)
-            }
-          ]
-        };
-      }
-      
-      // Application approved
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify({
-              isSimilar: false,
-              similarityScore: highestSimilarity,
-              mostSimilarCompany: mostSimilarCompany ? {
-                name: mostSimilarCompany.name,
-                reason: `Closest match but below rejection threshold: ${mostSimilarCompany.reason}`
-              } : null,
-              analysis: {
-                businessModelSimilarity: `${Math.round(highestSimilarity * 100)}% similarity - within acceptable range`,
-                targetMarketOverlap: "Minimal or no significant overlap",
-                valuePropSimilarity: "Sufficiently differentiated value proposition",
-                differentiationPotential: "Good - clear differentiation opportunities"
-              },
-              recommendation: "APPROVE",
-              feedback: `Your startup idea is sufficiently differentiated from existing Y Combinator companies. While there may be some conceptual similarities (${Math.round(highestSimilarity * 100)}% similarity score), your approach appears unique enough to warrant further consideration.`,
-              suggestions: [
-                "Continue developing your unique value proposition",
-                "Focus on specific market needs that existing solutions don't address",
-                "Build proprietary technology or processes",
-                "Establish clear competitive advantages",
-                "Consider strategic partnerships for market differentiation"
-              ]
-            }, null, 2)
-          }
-        ]
-      };
+      return this.createApprovalResponse(mostSimilarCompany, {
+        overallSimilarity: Math.round(highestSimilarity * 100),
+        reason: 'Idea is sufficiently differentiated from existing Y Combinator companies.'
+      }, userApplication);
       
     } catch (error) {
       console.error('❌ Fallback analysis error:', error);
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify({
-              error: true,
-              message: error.message,
-              isSimilar: false,
-              recommendation: "APPROVE"
-            })
-          }
-        ],
-        isError: true
-      };
+      return this.createErrorResponse(error.message);
     }
   }
 
@@ -558,6 +380,243 @@ Be strict but fair. Reject only if there's significant overlap in core business 
     const distance = matrix[len2][len1];
     const maxLen = Math.max(len1, len2);
     return maxLen === 0 ? 1 : 1 - distance / maxLen;
+  }
+
+  // Helper method for calculating business concept similarity
+  calculateBusinessConceptSimilarity(text1, text2) {
+    const words1 = new Set(text1.toLowerCase().split(/\s+/).filter(word => word.length > 3));
+    const words2 = new Set(text2.toLowerCase().split(/\s+/).filter(word => word.length > 3));
+    
+    const intersection = new Set([...words1].filter(word => words2.has(word)));
+    
+    // Enhanced similarity that gives more weight to important business keywords
+    const importantKeywords = [
+      'customer', 'service', 'support', 'chat', 'communication', 'mobile', 'platform',
+      'payment', 'fraud', 'detection', 'analytics', 'marketplace', 'rental', 'accommodation'
+    ];
+    
+    let importantMatches = 0;
+    let totalImportantWords = 0;
+    
+    for (const keyword of importantKeywords) {
+      const inText1 = text1.includes(keyword);
+      const inText2 = text2.includes(keyword);
+      
+      if (inText1 || inText2) {
+        totalImportantWords++;
+        if (inText1 && inText2) {
+          importantMatches++;
+        }
+      }
+    }
+    
+    // Base Jaccard similarity
+    const union = new Set([...words1, ...words2]);
+    const jaccardSimilarity = intersection.size > 0 ? intersection.size / union.size : 0;
+    
+    // Important keyword similarity
+    const keywordSimilarity = totalImportantWords > 0 ? importantMatches / totalImportantWords : 0;
+    
+    // Combined similarity (weighted toward important keywords)
+    return (jaccardSimilarity * 0.4) + (keywordSimilarity * 0.6);
+  }
+
+  // Helper method for analyzing business similarity between user application and YC company
+  analyzeBusinessSimilarity(userApplication, company) {
+    const userProblem = (userApplication.problemStatement || '').toLowerCase();
+    const userSolution = (userApplication.proposedSolution || '').toLowerCase();
+    const userDesc = userApplication.description.toLowerCase();
+    const userBusinessModel = (userApplication.businessModel || '').toLowerCase();
+    
+    const companyOneLiner = (company.oneLiner || '').toLowerCase();
+    const companyDesc = (company.description || '').toLowerCase();
+    
+    // 1. Problem similarity - comparing what problems they solve
+    const problemSimilarity = this.calculateBusinessConceptSimilarity(
+      userProblem + ' ' + userDesc,
+      companyOneLiner + ' ' + companyDesc
+    );
+    
+    // 2. Solution similarity - comparing how they solve the problem
+    const solutionSimilarity = this.calculateBusinessConceptSimilarity(
+      userSolution,
+      companyDesc
+    );
+    
+    // 3. Business model similarity - comparing how they make money
+    const businessModelSimilarity = userBusinessModel ? 
+      this.calculateBusinessConceptSimilarity(userBusinessModel, companyDesc) : 0;
+    
+    // 4. Technology/approach keywords matching
+    const techKeywords = [
+      'ai', 'machine learning', 'blockchain', 'api', 'saas', 'platform', 'marketplace',
+      'mobile', 'web', 'app', 'software', 'hardware', 'iot', 'cloud', 'analytics'
+    ];
+    
+    let techMatches = 0;
+    let userHasTech = 0;
+    let companyHasTech = 0;
+    
+    for (const keyword of techKeywords) {
+      const userHasKeyword = userDesc.includes(keyword) || userSolution.includes(keyword);
+      const companyHasKeyword = companyOneLiner.includes(keyword) || companyDesc.includes(keyword);
+      
+      if (userHasKeyword) userHasTech++;
+      if (companyHasKeyword) companyHasTech++;
+      if (userHasKeyword && companyHasKeyword) techMatches++;
+    }
+    
+    const techSimilarity = (userHasTech > 0 && companyHasTech > 0) ? 
+      techMatches / Math.max(userHasTech, companyHasTech) : 0;
+    
+    // 5. Industry/vertical keywords matching  
+    const industryKeywords = [
+      'customer service', 'customer support', 'communication', 'chat', 'helpdesk',
+      'payment', 'fintech', 'marketplace', 'travel', 'rental', 'accommodation',
+      'fraud', 'security', 'analytics', 'e-commerce', 'retail'
+    ];
+    
+    let industryMatches = 0;
+    let userHasIndustry = 0;
+    let companyHasIndustry = 0;
+    
+    const userFullText = userDesc + ' ' + userProblem + ' ' + userSolution;
+    const companyFullText = companyOneLiner + ' ' + companyDesc;
+    
+    for (const keyword of industryKeywords) {
+      const userHasKeyword = userFullText.includes(keyword);
+      const companyHasKeyword = companyFullText.includes(keyword);
+      
+      if (userHasKeyword) userHasIndustry++;
+      if (companyHasKeyword) companyHasIndustry++;
+      if (userHasKeyword && companyHasKeyword) industryMatches++;
+    }
+    
+    const industrySimilarity = (userHasIndustry > 0 && companyHasIndustry > 0) ? 
+      industryMatches / Math.max(userHasIndustry, companyHasIndustry) : 0;
+    
+    return {
+      problemSimilarity,
+      solutionSimilarity,
+      businessModelSimilarity,
+      techSimilarity,
+      industrySimilarity,
+      userTechCount: userHasTech,
+      companyTechCount: companyHasTech,
+      techMatches,
+      industryMatches
+    };
+  }
+
+  // Helper method for calculating overall business similarity
+  calculateOverallBusinessSimilarity(analysis) {
+    // Weighted calculation based on importance:
+    // Problem similarity is most important (30%)
+    // Industry/vertical similarity is very important (30%)
+    // Solution similarity is important (20%)
+    // Tech/approach similarity is moderate (15%)
+    // Business model similarity is least (5%)
+    
+    return (analysis.problemSimilarity * 0.3) + 
+           (analysis.industrySimilarity * 0.3) + 
+           (analysis.solutionSimilarity * 0.2) + 
+           (analysis.techSimilarity * 0.15) + 
+           (analysis.businessModelSimilarity * 0.05);
+  }
+
+  // Helper method for creating rejection response
+  createRejectionResponse(company, matchType, details, userApplication) {
+    const feedback = matchType === 'NAME_AND_PROBLEM_MATCH' ? 
+      `Your application title "${userApplication.title}" is very similar to "${company.name}" (${details.nameSimilarity}% name similarity) and your problem/description is also similar (${details.problemSimilarity}% similarity). This suggests you're working on the same or very similar concept.` :
+      `While your application has a different name, your business concept shows ${details.overallSimilarity}% similarity to "${company.name}". Your problem statement, solution approach, or business model appears too similar to this existing Y Combinator company.`;
+    
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            isSimilar: true,
+            similarityScore: matchType === 'NAME_AND_PROBLEM_MATCH' ? 0.95 : details.overallSimilarity / 100,
+            mostSimilarCompany: {
+              name: company.name,
+              reason: details.reason
+            },
+            analysis: {
+              titleSimilarity: matchType === 'NAME_AND_PROBLEM_MATCH' ? `${details.nameSimilarity}% - Very high name similarity` : "No significant name similarity",
+              problemSimilarity: `${details.problemSimilarity || 0}% similarity in problem statements`,
+              solutionSimilarity: `${details.solutionSimilarity || 0}% similarity in proposed solutions`,
+              businessModelSimilarity: `${details.businessModelSimilarity || 0}% similarity in business models`
+            },
+            recommendation: "REJECT",
+            feedback,
+            suggestions: [
+              `Research ${company.name}'s current offerings and identify clear gaps or limitations`,
+              "Focus on a specific market segment or use case that ${company.name} doesn't serve",
+              "Develop a fundamentally different approach or technology to solve the same problem",
+              "Consider targeting a different customer base (B2B vs B2C, different industries)",
+              "Pivot to solve a related but different problem in the same space"
+            ]
+          }, null, 2)
+        }
+      ]
+    };
+  }
+
+  // Helper method for creating approval response
+  createApprovalResponse(mostSimilarCompany, details, userApplication) {
+    const feedback = mostSimilarCompany ? 
+      `Your startup idea is sufficiently differentiated from existing Y Combinator companies. The closest match is "${mostSimilarCompany.name}" with ${details.overallSimilarity}% similarity, which is within acceptable ranges. Your approach appears unique enough to warrant consideration.` :
+      "Your startup idea appears to be highly unique with no significant similarities to existing Y Combinator companies.";
+    
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            isSimilar: false,
+            similarityScore: details.overallSimilarity / 100,
+            mostSimilarCompany: mostSimilarCompany ? {
+              name: mostSimilarCompany.name,
+              reason: `Closest match with ${details.overallSimilarity}% similarity - sufficiently differentiated`
+            } : null,
+            analysis: {
+              titleSimilarity: "No significant name conflicts detected",
+              problemSimilarity: "Problem statement is sufficiently unique",
+              solutionSimilarity: "Solution approach is differentiated",
+              businessModelSimilarity: "Business model shows good differentiation"
+            },
+            recommendation: "APPROVE",
+            feedback,
+            suggestions: [
+              "Continue developing your unique value proposition",
+              "Focus on specific market needs that existing solutions don't fully address",
+              "Build proprietary technology or processes for competitive advantage",
+              "Establish clear differentiators in your go-to-market strategy",
+              "Consider strategic partnerships to accelerate market entry"
+            ]
+          }, null, 2)
+        }
+      ]
+    };
+  }
+
+  // Helper method for creating error response
+  createErrorResponse(errorMessage) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            error: true,
+            message: errorMessage,
+            isSimilar: false,
+            recommendation: "APPROVE",
+            feedback: "Unable to complete similarity analysis due to technical error. Application approved by default."
+          })
+        }
+      ],
+      isError: true
+    };
   }
 
   async fetchYCCompanies(args = {}) {
@@ -794,10 +853,24 @@ Be strict but fair. Reject only if there's significant overlap in core business 
           founded: 2017,
           status: "Active",
           formerNames: []
+        },
+        {
+          id: 6,
+          name: "Hipmob",
+          slug: "hipmob",
+          oneLiner: "Customer communication for iOS and Android developers",
+          description: "Hipmob brings easy to use live chat, helpdesk, feedback and customer engagement tools to mobile and tablet businesses. Whether you're a mobile-native startup, a small business going mobile, or a large public company with a growing mobile business, we give you the tools to increase sales, transform customer support, and make your customers happy.",
+          tags: ["Customer Service", "Mobile", "Communication", "Live Chat"],
+          industry: "Consumer",
+          subindustry: "Customer Service",
+          batch: "Winter 2012",
+          founded: 2012,
+          status: "Inactive",
+          formerNames: []
         }
       ];
 
-      console.log(`🎯 Fallback dataset includes ${fallbackCompanies.length} companies including Corgi Labs`);
+      console.log(`🎯 Fallback dataset includes ${fallbackCompanies.length} companies including Corgi Labs and Hipmob`);
 
       return {
         content: [
@@ -811,7 +884,7 @@ Be strict but fair. Reject only if there's significant overlap in core business 
               fallbackData: true,
               query: args,
               fetchedAt: new Date().toISOString(),
-              source: 'Enhanced Fallback Mock Data (includes Corgi Labs and fraud detection companies)',
+              source: 'Enhanced Fallback Mock Data (includes Corgi Labs, Hipmob and fraud detection companies)',
               analysisMode: 'FALLBACK_FULL_DATASET'
             }, null, 2)
           }
