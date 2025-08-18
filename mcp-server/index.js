@@ -6,6 +6,7 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprot
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import dotenv from 'dotenv';
 import axios from 'axios';
+import { PrismaClient } from '@prisma/client';
 
 // Load environment variables
 dotenv.config();
@@ -27,6 +28,9 @@ class ExternalReviewMCPServer {
     // Initialize Gemini AI
     this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'your-gemini-api-key');
     this.model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+    // Initialize Prisma Client for database access
+    this.prisma = new PrismaClient();
 
     this.setupToolHandlers();
   }
@@ -77,6 +81,82 @@ class ExternalReviewMCPServer {
             }
           },
           {
+            name: 'analyze_internal_idea_similarity',
+            description: 'Analyze startup idea similarity against other user applications in the database',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                userApplication: {
+                  type: 'object',
+                  properties: {
+                    title: { type: 'string', description: 'The name/title of the startup/project' },
+                    description: { type: 'string', description: 'Overall description of the startup' },
+                    problemStatement: { type: 'string', description: 'The specific problem this startup is solving' },
+                    proposedSolution: { type: 'string', description: 'How the startup plans to solve the problem' },
+                    techStack: { type: 'array', items: { type: 'string' }, description: 'Technologies used' },
+                    teamSize: { type: 'number', description: 'Number of team members' },
+                    currentUserId: { type: 'string', description: 'Current user ID to exclude from comparison' }
+                  },
+                  required: ['title', 'description', 'problemStatement', 'proposedSolution', 'currentUserId']
+                },
+                internalData: {
+                  type: 'object',
+                  properties: {
+                    applications: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string' },
+                          title: { type: 'string' },
+                          description: { type: 'string' },
+                          problemStatement: { type: 'string' },
+                          solution: { type: 'string' },
+                          techStack: { type: 'array', items: { type: 'string' } },
+                          teamSize: { type: 'number' },
+                          userId: { type: 'string' },
+                          status: { type: 'string' },
+                          createdAt: { type: 'string' }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              required: ['userApplication', 'internalData']
+            }
+          },
+          {
+            name: 'fetch_internal_applications',
+            description: 'Fetch user applications from the database for internal similarity analysis',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                excludeUserId: { 
+                  type: 'string', 
+                  description: 'User ID to exclude from results (current user)' 
+                },
+                status: { 
+                  type: 'string', 
+                  description: 'Filter by application status (e.g., "SUBMITTED", "ACCEPTED", "REJECTED")' 
+                },
+                limit: { 
+                  type: 'number', 
+                  description: 'Maximum number of applications to fetch (default: all)' 
+                },
+                includeInactive: {
+                  type: 'boolean',
+                  description: 'Include inactive/deleted applications (default: false)'
+                },
+                forSimilarityAnalysis: {
+                  type: 'boolean',
+                  description: 'If true, returns all applications for comprehensive similarity analysis (ignores limit)'
+                }
+              },
+              required: ['excludeUserId']
+            }
+          },
+          {
             name: 'fetch_yc_companies',
             description: 'Fetch Y Combinator companies data from the official YC API',
             inputSchema: {
@@ -110,8 +190,12 @@ class ExternalReviewMCPServer {
       switch (request.params.name) {
         case 'analyze_idea_similarity':
           return this.analyzeIdeaSimilarity(request.params.arguments);
+        case 'analyze_internal_idea_similarity':
+          return this.analyzeInternalIdeaSimilarity(request.params.arguments);
         case 'fetch_yc_companies':
           return this.fetchYCCompanies(request.params.arguments);
+        case 'fetch_internal_applications':
+          return this.fetchInternalApplications(request.params.arguments);
         default:
           throw new Error(`Unknown tool: ${request.params.name}`);
       }
@@ -894,13 +978,587 @@ Be precise and thorough in your analysis.
     }
   }
 
+  async analyzeInternalIdeaSimilarity(args) {
+    try {
+      const { userApplication, internalData } = args;
+      
+      console.log(`🔍 Starting internal similarity analysis for "${userApplication.title}"`);
+      console.log(`📊 Analyzing against ${internalData.applications.length} internal applications`);
+      
+      // Check if we have a valid Gemini API key
+      const hasValidApiKey = process.env.GEMINI_API_KEY && 
+                           process.env.GEMINI_API_KEY !== 'your-gemini-api-key' && 
+                           process.env.GEMINI_API_KEY !== 'test-key';
+      
+      if (!hasValidApiKey) {
+        console.error('⚠️ No valid Gemini API key found. Using fallback similarity detection.');
+        // Use fallback similarity detection for internal applications
+        return this.fallbackInternalSimilarityAnalysis(userApplication, internalData.applications);
+      }
+      
+      // Create comprehensive prompt for Gemini for internal similarity analysis
+      const prompt = `
+You are an expert startup analyst evaluating if a user's startup idea is too similar to existing applications in our internal database.
+
+Your task is to determine if the idea should be REJECTED or APPROVED based on these specific criteria:
+
+USER APPLICATION:
+Title: ${userApplication.title}
+Description: ${userApplication.description}
+Problem Statement: ${userApplication.problemStatement}
+Proposed Solution: ${userApplication.proposedSolution}
+Tech Stack: ${userApplication.techStack?.join(', ') || 'Not specified'}
+Team Size: ${userApplication.teamSize || 'Not specified'}
+
+EXISTING INTERNAL APPLICATIONS:
+${internalData.applications.map(app => `
+- Application ID: ${app.id}
+  Title: ${app.title}
+  Description: ${app.description}
+  Problem Statement: ${app.problemStatement}
+  Solution: ${app.solution}
+  Tech Stack: ${app.techStack?.join(', ') || 'None'}
+  Team Size: ${app.teamSize || 'Not specified'}
+  Status: ${app.status}
+  Created: ${new Date(app.createdAt).toLocaleDateString()}
+`).join('\n')}
+
+REJECTION CRITERIA (Reject if ANY of these apply):
+1. SAME/SIMILAR NAME + SAME/SIMILAR PROBLEM: Title name and description/problem are same or very similar
+2. DIFFERENT NAME BUT SAME CONCEPT: Title is different but problem statement, solution approach, or business model is same or very similar
+3. DUPLICATE TECH IMPLEMENTATION: Using same tech stack to solve the same problem in the same way
+
+APPROVAL CRITERIA (Approve if ANY of these apply):
+1. TOTALLY UNIQUE: Title name and description/problem are solving a NEW problem not in our database
+2. DIFFERENT APPROACH: Problem exists but the way they're addressing it is totally different and unique
+3. SIGNIFICANT DIFFERENTIATION: While similar, brings substantial innovation or targets different market segment
+
+ANALYSIS FRAMEWORK:
+- Compare TITLE similarity (exact names, variations, synonyms)
+- Compare PROBLEM STATEMENTS (what core problem is being solved)
+- Compare PROPOSED SOLUTIONS (how they solve the problem)
+- Compare TECH STACKS (technology choices and implementation approach)
+- Consider TEAM SIZE and SCOPE differences
+- Consider STATUS of existing applications (prioritize active/accepted ones)
+
+Focus on CORE BUSINESS CONCEPT and EXECUTION APPROACH, not just superficial similarities.
+
+Please provide a JSON response with:
+{
+  "isSimilar": boolean,
+  "similarityScore": number (0-1),
+  "mostSimilarApplication": {
+    "id": "string",
+    "title": "string",
+    "reason": "string explaining the similarity"
+  },
+  "analysis": {
+    "titleSimilarity": "analysis of name/title similarity",
+    "problemSimilarity": "analysis of problem statement similarity", 
+    "solutionSimilarity": "analysis of proposed solution similarity",
+    "techStackSimilarity": "analysis of technology stack similarity"
+  },
+  "recommendation": "APPROVE" | "REJECT",
+  "feedback": "detailed feedback explaining the decision",
+  "suggestions": ["array of suggestions for improvement if rejected"]
+}
+
+Be precise and thorough in your analysis.
+`;
+
+      // Call Gemini AI
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+
+      // Try to parse JSON from the response
+      let analysis;
+      try {
+        // Extract JSON from the response (Gemini might wrap it in markdown)
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        analysis = JSON.parse(jsonMatch ? jsonMatch[0] : text);
+      } catch (parseError) {
+        // Fallback if JSON parsing fails
+        console.error('⚠️ Failed to parse Gemini response. Using fallback analysis.');
+        return this.fallbackInternalSimilarityAnalysis(userApplication, internalData.applications);
+      }
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(analysis, null, 2)
+          }
+        ]
+      };
+
+    } catch (error) {
+      console.error('❌ Gemini API Error for internal analysis:', error.message);
+      // Use fallback instead of generic approval
+      return this.fallbackInternalSimilarityAnalysis(args.userApplication, args.internalData.applications);
+    }
+  }
+
+  /**
+   * Fallback similarity analysis when Gemini API is not available for internal applications
+   * Implements precise business logic for startup idea similarity detection against internal database
+   */
+  fallbackInternalSimilarityAnalysis(userApplication, internalApplications) {
+    try {
+      const userTitle = userApplication.title.toLowerCase();
+      const userDesc = userApplication.description.toLowerCase();
+      const userProblem = (userApplication.problemStatement || '').toLowerCase();
+      const userSolution = (userApplication.proposedSolution || '').toLowerCase();
+      const userTechStack = (userApplication.techStack || []).map(tech => tech.toLowerCase());
+      
+      console.log(`🔍 Analyzing internal similarity against ${internalApplications.length} applications...`);
+      console.log(`📋 User Application: "${userApplication.title}"`);
+      console.log(`📝 Problem: "${userApplication.problemStatement}"`);
+      console.log(`💡 Solution: "${userApplication.proposedSolution}"`);
+      console.log(`🔧 Tech Stack: [${userTechStack.join(', ')}]`);
+      
+      // Step 1: Check for name similarity with existing applications
+      console.log('\n🎯 Step 1: Checking name similarity with internal applications...');
+      for (const app of internalApplications) {
+        const appTitle = app.title.toLowerCase();
+        
+        const nameSimilarity = this.calculateStringSimilarity(userTitle, appTitle);
+        const normalizedUserTitle = userTitle.replace(/[^a-z0-9]/g, '');
+        const normalizedAppTitle = appTitle.replace(/[^a-z0-9]/g, '');
+        
+        // Name match criteria: high similarity OR exact match OR containment
+        const isHighSimilarity = nameSimilarity > 0.85;
+        const isExactMatch = normalizedUserTitle === normalizedAppTitle;
+        const isContainedMatch = (normalizedUserTitle.length > 3 && normalizedAppTitle.includes(normalizedUserTitle)) ||
+                                (normalizedAppTitle.length > 3 && normalizedUserTitle.includes(normalizedAppTitle));
+        
+        if (isHighSimilarity || isExactMatch || isContainedMatch) {
+          console.log(`❌ NAME MATCH FOUND: ${app.title} (similarity: ${Math.round(nameSimilarity * 100)}%)`);
+          
+          // Check if problem/description is also similar
+          const problemSimilarity = this.calculateBusinessConceptSimilarity(
+            userDesc + ' ' + userProblem,
+            (app.description || '') + ' ' + (app.problemStatement || '')
+          );
+          
+          console.log(`📊 Problem similarity: ${Math.round(problemSimilarity * 100)}%`);
+          
+          // For exact name matches, reject if problem similarity is >10% (very low threshold)
+          // For high similarity names, reject if problem similarity is >30%
+          const rejectionThreshold = (isExactMatch || nameSimilarity > 0.95) ? 0.1 : 0.3;
+          
+          if (problemSimilarity > rejectionThreshold) {
+            return this.createInternalRejectionResponse(app, 'NAME_AND_PROBLEM_MATCH', {
+              nameSimilarity: Math.round(nameSimilarity * 100),
+              problemSimilarity: Math.round(problemSimilarity * 100),
+              reason: `Same/similar name "${userApplication.title}" matches internal application "${app.title}" AND the problem/description is also similar (${Math.round(problemSimilarity * 100)}% similarity).`
+            }, userApplication);
+          }
+        }
+      }
+      
+      console.log('✅ No significant name matches found. Proceeding to business concept analysis...');
+      
+      // Step 2: Check for business concept similarity (different name but same concept)
+      console.log('\n🧠 Step 2: Analyzing business concept similarity with internal applications...');
+      
+      let highestSimilarity = 0;
+      let mostSimilarApplication = null;
+      let similarityDetails = null;
+      
+      for (let i = 0; i < internalApplications.length; i++) {
+        const app = internalApplications[i];
+        
+        if (i % 50 === 0 && i > 0) {
+          console.log(`📈 Progress: ${i}/${internalApplications.length} applications analyzed`);
+        }
+        
+        // Analyze different aspects of business similarity
+        const analysis = this.analyzeInternalBusinessSimilarity(userApplication, app);
+        
+        // Calculate overall business concept similarity
+        const overallSimilarity = this.calculateOverallInternalBusinessSimilarity(analysis);
+        
+        if (overallSimilarity > highestSimilarity) {
+          highestSimilarity = overallSimilarity;
+          mostSimilarApplication = app;
+          similarityDetails = analysis;
+        }
+      }
+      
+      console.log(`🎯 Analysis complete. Highest business similarity: ${Math.round(highestSimilarity * 100)}% with ${mostSimilarApplication?.title || 'no application'}`);
+      
+      // Step 3: Make decision based on business concept similarity
+      // Reject if business concept similarity is high (>50% for internal apps - stricter than external)
+      const businessConceptThreshold = 0.5;
+      
+      if (highestSimilarity > businessConceptThreshold && mostSimilarApplication) {
+        console.log(`❌ REJECTING: Business concept too similar (${Math.round(highestSimilarity * 100)}%) to internal application ${mostSimilarApplication.title}`);
+        
+        return this.createInternalRejectionResponse(mostSimilarApplication, 'BUSINESS_CONCEPT_MATCH', {
+          overallSimilarity: Math.round(highestSimilarity * 100),
+          problemSimilarity: Math.round(similarityDetails.problemSimilarity * 100),
+          solutionSimilarity: Math.round(similarityDetails.solutionSimilarity * 100),
+          techStackSimilarity: Math.round(similarityDetails.techStackSimilarity * 100),
+          reason: `Different name but same/similar business concept. Your problem statement, solution approach, or tech stack is too similar to internal application "${mostSimilarApplication.title}".`
+        }, userApplication);
+      }
+      
+      // Approve - sufficiently unique
+      console.log(`✅ APPROVING: Idea is sufficiently unique (${Math.round(highestSimilarity * 100)}% max similarity)`);
+      
+      return this.createInternalApprovalResponse(mostSimilarApplication, {
+        overallSimilarity: Math.round(highestSimilarity * 100),
+        reason: 'Idea is sufficiently differentiated from existing internal applications.'
+      }, userApplication);
+      
+    } catch (error) {
+      console.error('❌ Fallback internal analysis error:', error);
+      return this.createErrorResponse(error.message);
+    }
+  }
+
+  // Helper method for analyzing business similarity between user application and internal application
+  analyzeInternalBusinessSimilarity(userApplication, internalApp) {
+    const userProblem = (userApplication.problemStatement || '').toLowerCase();
+    const userSolution = (userApplication.proposedSolution || '').toLowerCase();
+    const userDesc = userApplication.description.toLowerCase();
+    const userTechStack = (userApplication.techStack || []).map(tech => tech.toLowerCase());
+    
+    const appProblem = (internalApp.problemStatement || '').toLowerCase();
+    const appSolution = (internalApp.solution || '').toLowerCase();
+    const appDesc = (internalApp.description || '').toLowerCase();
+    const appTechStack = (internalApp.techStack || []).map(tech => tech.toLowerCase());
+    
+    // 1. Problem similarity - comparing what problems they solve
+    const problemSimilarity = this.calculateBusinessConceptSimilarity(
+      userProblem + ' ' + userDesc,
+      appProblem + ' ' + appDesc
+    );
+    
+    // 2. Solution similarity - comparing how they solve the problem
+    const solutionSimilarity = this.calculateBusinessConceptSimilarity(
+      userSolution,
+      appSolution
+    );
+    
+    // 3. Tech stack similarity - comparing technology choices
+    let techStackSimilarity = 0;
+    if (userTechStack.length > 0 && appTechStack.length > 0) {
+      const commonTech = userTechStack.filter(tech => 
+        appTechStack.some(appTech => 
+          appTech.includes(tech) || tech.includes(appTech) ||
+          this.calculateStringSimilarity(tech, appTech) > 0.8
+        )
+      );
+      techStackSimilarity = commonTech.length / Math.max(userTechStack.length, appTechStack.length);
+    }
+    
+    // 4. Team size similarity (less important but can indicate scope)
+    const userTeamSize = userApplication.teamSize || 1;
+    const appTeamSize = internalApp.teamSize || 1;
+    const teamSizeSimilarity = 1 - Math.abs(userTeamSize - appTeamSize) / Math.max(userTeamSize, appTeamSize);
+    
+    // 5. Status consideration (active/accepted applications are more important)
+    const statusWeight = internalApp.status === 'ACCEPTED' ? 1.2 : 
+                        internalApp.status === 'SUBMITTED' ? 1.1 :
+                        internalApp.status === 'UNDER_REVIEW' ? 1.05 : 1.0;
+    
+    return {
+      problemSimilarity,
+      solutionSimilarity,
+      techStackSimilarity,
+      teamSizeSimilarity,
+      statusWeight,
+      appStatus: internalApp.status,
+      commonTechCount: userTechStack.filter(tech => 
+        appTechStack.some(appTech => 
+          appTech.includes(tech) || tech.includes(appTech)
+        )
+      ).length
+    };
+  }
+
+  // Helper method for calculating overall internal business similarity
+  calculateOverallInternalBusinessSimilarity(analysis) {
+    // Weighted calculation for internal applications:
+    // Problem similarity is most important (35%)
+    // Solution similarity is very important (30%)
+    // Tech stack similarity is important (25%) - more weight than external
+    // Team size similarity is minor (10%)
+    // Status weight is applied as multiplier
+    
+    const baseSimilarity = (analysis.problemSimilarity * 0.35) + 
+                          (analysis.solutionSimilarity * 0.30) + 
+                          (analysis.techStackSimilarity * 0.25) + 
+                          (analysis.teamSizeSimilarity * 0.10);
+    
+    // Apply status weight (boost similarity for active/accepted applications)
+    return Math.min(baseSimilarity * analysis.statusWeight, 1.0);
+  }
+
+  // Helper method for creating internal rejection response
+  createInternalRejectionResponse(app, matchType, details, userApplication) {
+    const feedback = matchType === 'NAME_AND_PROBLEM_MATCH' ? 
+      `Your application title "${userApplication.title}" is very similar to internal application "${app.title}" (${details.nameSimilarity}% name similarity) and your problem/description is also similar (${details.problemSimilarity}% similarity). This suggests you're working on the same or very similar concept as another user.` :
+      `While your application has a different name, your business concept shows ${details.overallSimilarity}% similarity to internal application "${app.title}". Your problem statement, solution approach, or tech stack appears too similar to this existing application in our database.`;
+    
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            isSimilar: true,
+            similarityScore: matchType === 'NAME_AND_PROBLEM_MATCH' ? 0.95 : details.overallSimilarity / 100,
+            mostSimilarApplication: {
+              id: app.id,
+              title: app.title,
+              status: app.status,
+              reason: details.reason
+            },
+            analysis: {
+              titleSimilarity: matchType === 'NAME_AND_PROBLEM_MATCH' ? `${details.nameSimilarity}% - Very high name similarity` : "No significant name similarity",
+              problemSimilarity: `${details.problemSimilarity || 0}% similarity in problem statements`,
+              solutionSimilarity: `${details.solutionSimilarity || 0}% similarity in proposed solutions`,
+              techStackSimilarity: `${details.techStackSimilarity || 0}% similarity in technology stacks`
+            },
+            recommendation: "REJECT",
+            feedback,
+            suggestions: [
+              `Research the existing application "${app.title}" and identify clear gaps or limitations`,
+              "Focus on a specific market segment or use case that the existing application doesn't serve",
+              "Develop a fundamentally different technical approach or technology stack",
+              "Consider targeting a different user base or problem scope",
+              "Pivot to solve a related but different problem in the same domain",
+              "Collaborate with the existing team if the ideas are too similar"
+            ]
+          }, null, 2)
+        }
+      ]
+    };
+  }
+
+  // Helper method for creating internal approval response
+  createInternalApprovalResponse(mostSimilarApp, details, userApplication) {
+    const feedback = mostSimilarApp ? 
+      `Your startup idea is sufficiently differentiated from existing applications in our database. The closest match is "${mostSimilarApp.title}" with ${details.overallSimilarity}% similarity, which is within acceptable ranges. Your approach appears unique enough to warrant consideration.` :
+      "Your startup idea appears to be highly unique with no significant similarities to existing applications in our database.";
+    
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            isSimilar: false,
+            similarityScore: details.overallSimilarity / 100,
+            mostSimilarApplication: mostSimilarApp ? {
+              id: mostSimilarApp.id,
+              title: mostSimilarApp.title,
+              status: mostSimilarApp.status,
+              reason: `Closest match with ${details.overallSimilarity}% similarity - sufficiently differentiated`
+            } : null,
+            analysis: {
+              titleSimilarity: "No significant name conflicts detected",
+              problemSimilarity: "Problem statement is sufficiently unique",
+              solutionSimilarity: "Solution approach is differentiated",
+              techStackSimilarity: "Technology stack shows good differentiation"
+            },
+            recommendation: "APPROVE",
+            feedback,
+            suggestions: [
+              "Continue developing your unique value proposition",
+              "Focus on specific technical innovations that set you apart",
+              "Build proprietary technology or processes for competitive advantage",
+              "Consider potential collaboration opportunities with similar teams",
+              "Document your unique approach clearly in your application"
+            ]
+          }, null, 2)
+        }
+      ]
+    };
+  }
+
+  async fetchInternalApplications(args = {}) {
+    try {
+      console.log('🔍 Fetching internal applications from database...');
+      console.log('📋 Request parameters:', JSON.stringify(args, null, 2));
+      
+      // Build query filters
+      const where = {
+        isActive: args.includeInactive ? undefined : true, // Only active applications by default
+        userId: args.excludeUserId ? { not: args.excludeUserId } : undefined, // Exclude current user
+      };
+
+      // Add status filter if specified
+      if (args.status) {
+        where.status = args.status;
+      }
+
+      // Clean up undefined values
+      Object.keys(where).forEach(key => where[key] === undefined && delete where[key]);
+
+      console.log('🔍 Database query where clause:', JSON.stringify(where, null, 2));
+
+      // Fetch applications from database
+      const applications = await this.prisma.application.findMany({
+        where,
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          problemStatement: true,
+          solution: true,
+          techStack: true,
+          teamSize: true,
+          teamMembers: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+          submittedAt: true,
+          category: true,
+          estimatedCost: true,
+          userId: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      console.log(`✅ Fetched ${applications.length} applications from database`);
+
+      // Transform data for similarity analysis
+      let processedApplications = applications.map(app => ({
+        id: app.id,
+        title: app.title,
+        description: app.description,
+        problemStatement: app.problemStatement,
+        solution: app.solution,
+        techStack: app.techStack || [],
+        teamSize: app.teamSize,
+        teamMembers: app.teamMembers || [],
+        status: app.status,
+        category: app.category,
+        estimatedCost: app.estimatedCost,
+        userId: app.userId,
+        userName: app.user?.name,
+        userEmail: app.user?.email,
+        createdAt: app.createdAt.toISOString(),
+        updatedAt: app.updatedAt.toISOString(),
+        submittedAt: app.submittedAt?.toISOString(),
+      }));
+
+      // IMPORTANT: For similarity analysis, we ALWAYS return ALL applications
+      // We never apply artificial limits when doing similarity analysis
+      const isForAnalysis = args.forSimilarityAnalysis || 
+                           (typeof args.limit === 'undefined') || 
+                           (args.limit > 1000); // If asking for >1000, assume it's for analysis
+      
+      if (!isForAnalysis && args.limit && args.limit > 0) {
+        const originalCount = processedApplications.length;
+        processedApplications = processedApplications.slice(0, args.limit);
+        console.log(`📝 LIMITED to ${processedApplications.length} applications (from ${originalCount}) due to explicit limit`);
+      } else {
+        console.log(`🚀 Returning ALL ${processedApplications.length} applications for comprehensive analysis`);
+      }
+
+      // Log some sample applications to verify we have data
+      const sampleApplications = processedApplications.slice(0, 3);
+      console.log(`📋 Sample applications: ${sampleApplications.map(a => `${a.title} (${a.status})`).join(', ')}`);
+      
+      // Check distribution by status
+      const statusCounts = {};
+      processedApplications.forEach(app => {
+        statusCounts[app.status] = (statusCounts[app.status] || 0) + 1;
+      });
+      console.log(`📊 Applications by status:`, statusCounts);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              applications: processedApplications,
+              total: processedApplications.length,
+              totalAvailable: applications.length,
+              query: args,
+              fetchedAt: new Date().toISOString(),
+              source: 'Internal Database',
+              dataStats: {
+                statusDistribution: statusCounts,
+                activeApplications: processedApplications.filter(a => a.status !== 'DRAFT').length,
+                submittedApplications: processedApplications.filter(a => a.status === 'SUBMITTED').length,
+                acceptedApplications: processedApplications.filter(a => a.status === 'ACCEPTED').length
+              },
+              analysisMode: isForAnalysis ? 'FULL_DATASET' : 'LIMITED'
+            }, null, 2)
+          }
+        ]
+      };
+
+    } catch (error) {
+      console.error('❌ Error fetching internal applications:', error.message);
+      
+      // Return error with empty dataset
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              applications: [],
+              total: 0,
+              error: true,
+              errorMessage: error.message,
+              query: args,
+              fetchedAt: new Date().toISOString(),
+              source: 'Internal Database (Failed)',
+              analysisMode: 'ERROR'
+            }, null, 2)
+          }
+        ],
+        isError: true
+      };
+    }
+  }
+
   async run() {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
     console.error('External Review MCP Server running on stdio');
+
+    // Handle graceful shutdown
+    process.on('SIGINT', async () => {
+      console.error('Shutting down MCP server...');
+      await this.cleanup();
+      process.exit(0);
+    });
+
+    process.on('SIGTERM', async () => {
+      console.error('Shutting down MCP server...');
+      await this.cleanup();
+      process.exit(0);
+    });
+  }
+
+  async cleanup() {
+    try {
+      await this.prisma.$disconnect();
+      console.error('Database connection closed');
+    } catch (error) {
+      console.error('Error during cleanup:', error);
+    }
   }
 }
 
-// Start the server
-const server = new ExternalReviewMCPServer();
-server.run().catch(console.error);
+// Export the class for testing
+export { ExternalReviewMCPServer };
+
+// Only start the server if this file is run directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const server = new ExternalReviewMCPServer();
+  server.run().catch(console.error);
+}
