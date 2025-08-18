@@ -1,0 +1,265 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type AIReview {
+  application: Application!
+  applicationId: String!
+  createdAt: DateTime!
+  errorMessage: String
+  feedback: String
+  id: ID!
+  metadata: String
+  processedAt: DateTime
+  result: ReviewResult!
+  score: Float
+  type: ReviewType!
+  updatedAt: DateTime!
+}
+
+type Application {
+  aiReviews: [AIReview!]
+  category: String
+  createdAt: DateTime!
+  demoUrl: String
+  description: String!
+  estimatedCost: Float
+  githubRepo: String
+  id: ID!
+  isActive: Boolean!
+  problemStatement: String!
+  rejectionReason: String
+  reviews: [Review!]
+  solution: String!
+  status: ApplicationStatus!
+  submittedAt: DateTime
+  teamMembers: [String!]!
+  teamSize: Float!
+  techStack: [String!]!
+  title: String!
+  updatedAt: DateTime!
+  user: User!
+  userId: String!
+}
+
+type ApplicationConnection {
+  nodes: [Application!]!
+  pageInfo: PaginationInfo!
+  totalCount: Float!
+}
+
+input ApplicationFilterInput {
+  category: String
+  isActive: Boolean
+  search: String
+  status: ApplicationStatus
+  userId: String
+}
+
+enum ApplicationStatus {
+  ACCEPTED
+  CATEGORIZATION
+  COST_REVIEW
+  DRAFT
+  EXTERNAL_IDEA_REVIEW
+  IMPACT_REVIEW
+  IMPLEMENTATION_REVIEW
+  INTERNAL_IDEA_REVIEW
+  REJECTED
+  SUBMITTED
+  UNDER_REVIEW
+}
+
+input CreateApplicationInput {
+  demoUrl: String
+  description: String!
+  estimatedCost: Float
+  githubRepo: String
+  problemStatement: String!
+  solution: String!
+  status: ApplicationStatus
+  teamMembers: [String!]!
+  teamSize: Float!
+  techStack: [String!]!
+  title: String!
+}
+
+input CreateReviewInput {
+  applicationId: String!
+  feedback: String
+  score: Float!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+type Mutation {
+  createApplication(input: CreateApplicationInput!): Application!
+  createReview(input: CreateReviewInput!): Review!
+  deleteApplication(id: ID!): Boolean!
+  deleteReview(id: ID!): Boolean!
+  deleteUser(id: ID!): Boolean!
+  submitApplication(id: ID!): Application!
+  updateApplication(id: ID!, input: UpdateApplicationInput!): Application!
+  updateApplicationStatus(id: ID!, rejectionReason: String, status: String!): Application!
+  updateProfile(input: UpdateUserInput!): User!
+  updateReview(id: ID!, input: UpdateReviewInput!): Review!
+  updateUserRole(id: ID!, role: String!): User!
+}
+
+type Notification {
+  actionUrl: String
+  createdAt: DateTime!
+  id: ID!
+  message: String!
+  metadata: String
+  read: Boolean!
+  sender: User
+  senderId: String
+  title: String!
+  type: NotificationType!
+  updatedAt: DateTime!
+  user: User!
+  userId: String!
+}
+
+enum NotificationType {
+  APPLICATION_REVIEW_ASSIGNED
+  APPLICATION_REVIEW_COMPLETED
+  APPLICATION_STATUS_CHANGE
+  DEADLINE_REMINDER
+  NEW_APPLICATION_SUBMITTED
+  SYSTEM_ANNOUNCEMENT
+}
+
+type PaginationInfo {
+  endCursor: String
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+}
+
+input PaginationInput {
+  after: String
+  before: String
+  first: Float
+  last: Float
+}
+
+type Query {
+  application(id: ID!): Application
+  applications(filter: ApplicationFilterInput, pagination: PaginationInput): ApplicationConnection!
+  getAIReviewStatus(id: ID!): String!
+  me: User!
+  myApplications(pagination: PaginationInput): [Application!]!
+  myReviews(pagination: PaginationInput): [Review!]!
+  review(id: ID!): Review
+  reviews(filter: ReviewFilterInput, pagination: PaginationInput): ReviewConnection!
+  reviewsForApplication(applicationId: ID!): [Review!]!
+  user(id: ID!): User
+  users(filter: UserFilterInput, pagination: PaginationInput): UserConnection!
+}
+
+type Review {
+  application: Application!
+  applicationId: String!
+  createdAt: DateTime!
+  feedback: String
+  id: ID!
+  reviewer: User!
+  reviewerId: String!
+  score: Float!
+  updatedAt: DateTime!
+}
+
+type ReviewConnection {
+  nodes: [Review!]!
+  pageInfo: PaginationInfo!
+  totalCount: Float!
+}
+
+input ReviewFilterInput {
+  applicationId: String
+  maxScore: Float
+  minScore: Float
+  reviewerId: String
+}
+
+enum ReviewResult {
+  APPROVED
+  PENDING
+  REJECTED
+}
+
+enum ReviewType {
+  CATEGORIZATION
+  COST_ANALYSIS
+  CUSTOMER_IMPACT
+  EXTERNAL_IDEA
+  IMPLEMENTATION_FEASIBILITY
+  INTERNAL_IDEA
+  MANUAL_REVIEW
+}
+
+input UpdateApplicationInput {
+  category: String
+  demoUrl: String
+  description: String
+  estimatedCost: Float
+  githubRepo: String
+  problemStatement: String
+  rejectionReason: String
+  solution: String
+  status: ApplicationStatus
+  teamMembers: [String!]
+  teamSize: Float
+  techStack: [String!]
+  title: String
+}
+
+input UpdateReviewInput {
+  feedback: String
+  score: Float
+}
+
+input UpdateUserInput {
+  avatar: String
+  firstName: String
+  lastName: String
+  name: String
+}
+
+type User {
+  applications: [Application!]
+  avatar: String
+  createdAt: DateTime!
+  email: String!
+  firstName: String
+  id: ID!
+  lastName: String
+  name: String!
+  notifications: [Notification!]
+  provider: String
+  providerId: String
+  reviews: [Review!]
+  role: UserRole!
+  updatedAt: DateTime!
+}
+
+type UserConnection {
+  nodes: [User!]!
+  pageInfo: PaginationInfo!
+  totalCount: Float!
+}
+
+input UserFilterInput {
+  role: String
+  search: String
+}
+
+enum UserRole {
+  ADMIN
+  PARTICIPANT
+}
