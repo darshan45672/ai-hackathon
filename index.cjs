@@ -1,21 +1,32 @@
 const { execSync } = require("child_process");
+const fs = require("fs");
 
 const filename = "index.cjs";
 
-const commitDate = "2025-08-07T11:00:00";
+const commitDates = [
+  "2025-08-19T11:00:00", 
+  "2025-08-20T11:00:00"
+];
 
-execSync(`git add ${filename}`, { stdio: "inherit" });
+commitDates.forEach((date) => {
+  fs.appendFileSync(filename, `Commit for ${date}\n`);
 
-const commitCommand = `git commit -m "Commit on 7th August 2025"`;
+  execSync(`git add ${filename}`, { stdio: "inherit" });
 
-const env = {
-  ...process.env,
-  GIT_AUTHOR_DATE: commitDate,
-  GIT_COMMITTER_DATE: commitDate,
-};
+  const commitCommand = `git commit -m "Commit on ${date}"`;
 
-execSync(commitCommand, { stdio: "inherit", env });
+  const env = {
+    ...process.env,
+    GIT_AUTHOR_DATE: date,
+    GIT_COMMITTER_DATE: date,
+  };
+
+  execSync(commitCommand, { stdio: "inherit", env });
+
+  console.log(`✅ Commit created for date: ${date}`);
+});
 
 execSync(`git push`, { stdio: "inherit" });
-
-console.log("✅ Commit created and pushed with date:", commitDate);
+console.log("🚀 All commits pushed to GitHub!");
+Commit for 2025-08-19T11:00:00
+Commit for 2025-08-20T11:00:00
