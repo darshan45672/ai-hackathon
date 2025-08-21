@@ -1,4 +1,4 @@
-FROM node:18-alpine
+FROM node:24-alpine
 
 WORKDIR /app
 
@@ -6,8 +6,8 @@ WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# Install dependencies
-RUN npm ci --only=production
+# Install dependencies with legacy peer deps to handle conflicts
+RUN npm ci --only=production --legacy-peer-deps
 
 # Generate Prisma client
 RUN npx prisma generate
