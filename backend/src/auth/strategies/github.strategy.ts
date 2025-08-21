@@ -7,8 +7,8 @@ import { ConfigService } from '@nestjs/config';
 export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
   constructor(private configService: ConfigService) {
     super({
-      clientID: configService.get('GITHUB_CLIENT_ID') || '',
-      clientSecret: configService.get('GITHUB_CLIENT_SECRET') || '',
+      clientID: configService.get('GITHUB_CLIENT_ID'),
+      clientSecret: configService.get('GITHUB_CLIENT_SECRET'),
       callbackURL: '/api/auth/github/callback',
       scope: ['user:email'],
     });
