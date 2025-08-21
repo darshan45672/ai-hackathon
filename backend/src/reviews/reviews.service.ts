@@ -54,9 +54,73 @@ export class ReviewsService {
     });
   }
 
+  async findByApplicationId(applicationId: string) {
+    return this.findByApplication(applicationId);
+  }
+
+  async findOne(id: string) {
+    const review = await this.databaseService.review.findUnique({
+      where: { id },
+      include: {
+        reviewer: true,
+        application: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+
+    if (!review) {
+      throw new NotFoundException('Review not found');
+    }
+
+    return review;
+  }
+
+  async findAll(page: number = 1, limit: number = 10, applicationId?: string, reviewerId?: string) {
+    const skip = (page - 1) * limit;
+    
+    const where: any = {};
+    
+    if (applicationId) {
+      where.applicationId = applicationId;
+    }
+    
+    if (reviewerId) {
+      where.reviewerId = reviewerId;
+    }
+
+    const [reviews, total] = await Promise.all([
+      this.databaseService.review.findMany({
+        where,
+        skip,
+        take: limit,
+        include: {
+          reviewer: true,
+          application: {
+            include: {
+              user: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.databaseService.review.count({ where }),
+    ]);
+
+    return {
+      reviews,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
   async findByReviewer(reviewerId: string, page: number = 1, limit: number = 10) {
     const skip = (page - 1) * limit;
-
+    
     const [reviews, total] = await Promise.all([
       this.databaseService.review.findMany({
         where: { reviewerId },
@@ -64,7 +128,11 @@ export class ReviewsService {
         take: limit,
         include: {
           reviewer: true,
-          application: true,
+          application: {
+            include: {
+              user: true,
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
       }),
@@ -78,6 +146,10 @@ export class ReviewsService {
       limit,
       totalPages: Math.ceil(total / limit),
     };
+  }
+
+  async findByReviewerId(reviewerId: string, page: number = 1, limit: number = 10) {
+    return this.findByReviewer(reviewerId, page, limit);
   }
 
   async getApplicationStats(applicationId: string) {
