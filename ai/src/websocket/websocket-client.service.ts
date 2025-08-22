@@ -58,7 +58,9 @@ export class WebSocketClient implements OnModuleInit, OnModuleDestroy {
       }
 
       try {
-        this.socket = io('http://localhost:3001', {
+        // Use environment variable or fallback to localhost
+        const backendUrl = process.env.BACKEND_URL || 'http://localhost';
+        this.socket = io(backendUrl, {
           auth: {
             // AI service authentication - you might want to use a service token
             service: 'ai-service',
