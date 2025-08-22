@@ -129,7 +129,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const response = await fetch('http://localhost:3001/api/users/me', {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost';
+      const response = await fetch(`${API_BASE_URL}/api/users/me`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
