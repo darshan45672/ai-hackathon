@@ -117,10 +117,33 @@ podman-compose -f podman-compose.production.yml up -d
 | **API Documentation** | http://localhost/api | - |
 | **GraphQL Playground** | http://localhost/graphql | - |
 | **Grafana Monitoring** | http://localhost:3000 | admin/admin |
-| **Prometheus Metrics** | http://localhost:9091 | - |
-| **Adminer (Database)** | http://localhost/adminer | postgres/password |
-| **Redis Commander** | http://localhost/redis-commander | - |
-| **MailHog (Email Testing)** | http://localhost/mailhog | - |
+| **Prometheus Metrics** | http://localhost:9090 | - |
+| **Frontend Dev Server** | http://localhost:3004 | - |
+| **AI Service** | http://localhost:3002 | - |
+| **Adminer (Database)** | http://localhost:8080 | postgres/password |
+| **Redis Commander** | http://localhost:8081 | - |
+| **MailHog (Email Testing)** | http://localhost:8025 | - |
+
+### 5. Quick Management
+
+Use the provided management script for easy operations:
+
+```bash
+# Start all services with monitoring
+./manage-monitoring.sh start
+
+# Check service health
+./manage-monitoring.sh health
+
+# Show all service URLs
+./manage-monitoring.sh urls
+
+# View logs
+./manage-monitoring.sh logs
+
+# Stop services
+./manage-monitoring.sh stop
+```
 
 ## 🔧 Configuration Guide
 
@@ -404,22 +427,59 @@ docker-compose up --scale app1=5
 
 ## 📊 Monitoring
 
+### Overview
+The platform includes a comprehensive monitoring stack with Prometheus and Grafana, providing real-time insights into application performance, resource usage, and system health.
+
+### Access Monitoring
+- **Grafana Dashboards**: http://localhost:3000 (admin/admin)
+- **Prometheus Metrics**: http://localhost:9090
+
+### Pre-configured Dashboards
+
+1. **Application Overview**
+   - Container CPU and memory usage
+   - Service health status (Backend, Frontend, AI Service, Database)
+   - System resource monitoring
+
+2. **API Performance**  
+   - HTTP request rates and response times
+   - Error rates (5xx responses)
+   - AI review processing metrics
+   - Endpoint-specific performance
+
+3. **Database Metrics**
+   - Connection counts and transaction rates
+   - Database size and growth tracking
+   - Query performance analysis
+   - Table operation statistics
+
+4. **AI Service Metrics**
+   - AI review request rates and processing times
+   - Error rates and service health
+   - Review type distribution
+   - MCP server performance
+   - Processing queue monitoring
+
+### Alerting
+Pre-configured alerts for:
+- **Critical**: Service downtime, high memory usage, database issues
+- **Warning**: High CPU usage, elevated error rates
+- **Email notifications** (configurable)
+
 ### Health Checks
 Each backend instance includes health checks accessible at `/api/health`.
 
-### Metrics
-- Prometheus collects metrics from all services
-- Grafana provides visual dashboards
-- Custom metrics available for application monitoring
+### Setup Instructions
+For detailed monitoring setup and customization, see [GRAFANA_SETUP.md](./GRAFANA_SETUP.md).
 
 ### Logs
 ```bash
 # View all logs
-docker-compose logs -f
+podman-compose -f podman-compose.development.yml logs -f
 
 # View specific service logs
-docker-compose logs -f app1
-docker-compose logs -f nginx
+podman-compose -f podman-compose.development.yml logs -f app1
+podman-compose -f podman-compose.development.yml logs -f nginx
 ```
 
 ## 🔧 Configuration

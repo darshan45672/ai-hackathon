@@ -1,27 +1,32 @@
 global:
-  scrape_interval: 30s
-  evaluation_interval: 30s
+  scrape_interval: 15s
+  evaluation_interval: 15s
 
 scrape_configs:
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
 
-  - job_name: 'backend-apps'
+  - job_name: 'ai-hackathon-backend'
     static_configs:
       - targets: ['app1:3001', 'app2:3001', 'app3:3001']
-    scrape_interval: 30s
+    scrape_interval: 15s
     metrics_path: '/metrics'
+    scrape_timeout: 10s
 
   - job_name: 'ai-service'
     static_configs:
       - targets: ['ai-service:3002']
-    scrape_interval: 30s
+    scrape_interval: 15s
+    metrics_path: '/metrics'
+    scrape_timeout: 10s
 
   - job_name: 'frontend'
     static_configs:
       - targets: ['frontend:3000']
-    scrape_interval: 60s
+    scrape_interval: 30s
+    metrics_path: '/metrics'
+    scrape_timeout: 10s
 
   - job_name: 'postgres'
     static_configs:
