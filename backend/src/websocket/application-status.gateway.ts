@@ -14,7 +14,14 @@ import { NotificationsService } from '../notifications/notifications.service';
 
 @WebSocketGateway({
   cors: {
-    origin: ['http://localhost:3000'], // Frontend URL
+    origin: [
+      'http://localhost:3000',
+      'http://localhost:3004', 
+      'http://localhost',
+      'http://nginx',
+      process.env.FRONTEND_URL,
+      process.env.BACKEND_URL
+    ].filter(Boolean), // Remove undefined values
     credentials: true,
   },
 })

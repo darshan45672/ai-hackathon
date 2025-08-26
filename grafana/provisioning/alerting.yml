@@ -1,0 +1,138 @@
+apiVersion: 1
+
+# List of contact points
+contactPoints:
+  - orgId: 1
+    name: grafana-default-email
+    receivers:
+      - uid: default-email
+        type: email
+        settings:
+          addresses: admin@ai-hackathon.local
+          subject: "Grafana Alert: {{ .GroupLabels.alertname }}"
+
+# List of alert rules
+groups:
+  - name: ai-hackathon-alerts
+    folder: alerts
+    interval: 30s
+    rules:
+      # High CPU usage alert
+      - uid: high-cpu-usage
+        title: High CPU Usage
+        condition: A
+        data:
+          - refId: A
+            queryType: ''
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: 'rate(container_cpu_usage_seconds_total{name=~"ai-hackathon.*"}[5m]) * 100 > 80'
+              refId: A
+        noDataState: NoData
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          summary: High CPU usage detected
+          description: "Container {{ $labels.name }} CPU usage is above 80%"
+        labels:
+          severity: warning
+          service: "{{ $labels.name }}"
+
+      # High memory usage alert  
+      - uid: high-memory-usage
+        title: High Memory Usage
+        condition: A
+        data:
+          - refId: A
+            queryType: ''
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: '(container_memory_usage_bytes{name=~"ai-hackathon.*"} / container_spec_memory_limit_bytes{name=~"ai-hackathon.*"}) * 100 > 85'
+              refId: A
+        noDataState: NoData
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          summary: High memory usage detected
+          description: "Container {{ $labels.name }} memory usage is above 85%"
+        labels:
+          severity: warning
+          service: "{{ $labels.name }}"
+
+      # Service down alert
+      - uid: service-down
+        title: Service Down
+        condition: A
+        data:
+          - refId: A
+            queryType: ''
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: 'up{job=~"ai-hackathon.*"} == 0'
+              refId: A
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 1m
+        annotations:
+          summary: Service is down
+          description: "Service {{ $labels.job }} is not responding"
+        labels:
+          severity: critical
+          service: "{{ $labels.job }}"
+
+      # High error rate alert
+      - uid: high-error-rate
+        title: High Error Rate
+        condition: A
+        data:
+          - refId: A
+            queryType: ''
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: 'rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) * 100 > 5'
+              refId: A
+        noDataState: NoData
+        execErrState: Alerting
+        for: 2m
+        annotations:
+          summary: High error rate detected
+          description: "HTTP 5xx error rate is above 5%"
+        labels:
+          severity: warning
+          service: api
+
+      # Database connection issues
+      - uid: database-connections
+        title: High Database Connections
+        condition: A
+        data:
+          - refId: A
+            queryType: ''
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: 'pg_stat_database_numbackends{datname="ai_hackathon"} > 80'
+              refId: A
+        noDataState: NoData
+        execErrState: Alerting
+        for: 3m
+        annotations:
+          summary: High database connection count
+          description: "Database connection count is above 80"
+        labels:
+          severity: warning
+          service: database

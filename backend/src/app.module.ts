@@ -12,6 +12,7 @@ import { ApplicationsModule } from './applications/applications.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { WebSocketModule } from './websocket/websocket.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { WebSocketModule } from './websocket/websocket.module';
     ReviewsModule,
     NotificationsModule,
     WebSocketModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [AppService],

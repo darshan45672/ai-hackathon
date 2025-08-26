@@ -58,8 +58,8 @@ export class WebSocketClient implements OnModuleInit, OnModuleDestroy {
       }
 
       try {
-        // Use environment variable or fallback to localhost
-        const backendUrl = process.env.BACKEND_URL || 'http://localhost';
+        // Use environment variable or fallback to nginx for container networking
+        const backendUrl = process.env.BACKEND_URL || 'http://nginx';
         this.socket = io(backendUrl, {
           auth: {
             // AI service authentication - you might want to use a service token
