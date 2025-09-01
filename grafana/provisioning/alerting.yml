@@ -29,17 +29,17 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: 'rate(container_cpu_usage_seconds_total{name=~"ai-hackathon.*"}[5m]) * 100 > 80'
+              expr: 'nodejs_heap_size_used_bytes / nodejs_heap_size_total_bytes * 100 > 80'
               refId: A
         noDataState: NoData
         execErrState: Alerting
         for: 5m
         annotations:
-          summary: High CPU usage detected
-          description: "Container {{ $labels.name }} CPU usage is above 80%"
+          summary: High memory usage detected
+          description: "Node.js application memory usage is above 80%"
         labels:
           severity: warning
-          service: "{{ $labels.name }}"
+          service: backend
 
       # High memory usage alert  
       - uid: high-memory-usage
@@ -53,17 +53,17 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: '(container_memory_usage_bytes{name=~"ai-hackathon.*"} / container_spec_memory_limit_bytes{name=~"ai-hackathon.*"}) * 100 > 85'
+              expr: 'nodejs_heap_size_used_bytes > 500000000'
               refId: A
         noDataState: NoData
         execErrState: Alerting
         for: 5m
         annotations:
           summary: High memory usage detected
-          description: "Container {{ $labels.name }} memory usage is above 85%"
+          description: "Node.js application memory usage is above 500MB"
         labels:
           severity: warning
-          service: "{{ $labels.name }}"
+          service: backend
 
       # Service down alert
       - uid: service-down
@@ -77,17 +77,17 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: 'up{job=~"ai-hackathon.*"} == 0'
+              expr: 'app_health_status == 0'
               refId: A
         noDataState: Alerting
         execErrState: Alerting
         for: 1m
         annotations:
-          summary: Service is down
-          description: "Service {{ $labels.job }} is not responding"
+          summary: Service is unhealthy
+          description: "Application health check is failing"
         labels:
           severity: critical
-          service: "{{ $labels.job }}"
+          service: backend
 
       # High error rate alert
       - uid: high-error-rate
@@ -101,21 +101,21 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: 'rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) * 100 > 5'
+              expr: 'app_error_total > 10'
               refId: A
         noDataState: NoData
         execErrState: Alerting
         for: 2m
         annotations:
           summary: High error rate detected
-          description: "HTTP 5xx error rate is above 5%"
+          description: "Application error count is above 10"
         labels:
           severity: warning
-          service: api
+          service: backend
 
       # Database connection issues
       - uid: database-connections
-        title: High Database Connections
+        title: Database Connection Issues
         condition: A
         data:
           - refId: A
@@ -125,14 +125,14 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: 'pg_stat_database_numbackends{datname="ai_hackathon"} > 80'
+              expr: 'database_connection_status == 0'
               refId: A
         noDataState: NoData
         execErrState: Alerting
         for: 3m
         annotations:
-          summary: High database connection count
-          description: "Database connection count is above 80"
+          summary: Database connection failed
+          description: "Database connection health check is failing"
         labels:
-          severity: warning
+          severity: critical
           service: database

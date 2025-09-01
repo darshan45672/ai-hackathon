@@ -206,6 +206,16 @@ class ExternalReviewMCPServer {
     try {
       const { userApplication, externalData } = args;
       
+      // Enhanced logging for debugging UI issues
+      console.log('🎯 EXTERNAL REVIEW STARTED');
+      console.log('📋 User Application Data:', JSON.stringify({
+        title: userApplication.title,
+        description: userApplication.description?.substring(0, 100) + '...',
+        problemStatement: userApplication.problemStatement?.substring(0, 100) + '...',
+        hasExternalData: !!externalData,
+        ycCompaniesCount: externalData?.ycCompanies?.length || 0
+      }, null, 2));
+      
       // Check if we have a valid Gemini API key
       const hasValidApiKey = process.env.GEMINI_API_KEY && 
                            process.env.GEMINI_API_KEY !== 'your-gemini-api-key' && 
@@ -357,15 +367,27 @@ Be precise and thorough in your analysis.
             
             console.log(`📊 Problem similarity: ${Math.round(problemSimilarity * 100)}%`);
             
-            // For exact name matches, reject if problem similarity is >10% (very low threshold)
-            // For high similarity names, reject if problem similarity is >30%
-            const rejectionThreshold = (isExactMatch || nameSimilarity > 0.95) ? 0.1 : 0.3;
+            // For EXACT name matches (100% similarity), reject immediately regardless of problem similarity
+            // This prevents users from submitting applications with the exact same name as existing YC companies
+            if (isExactMatch && nameSimilarity > 0.99) {
+              console.log(`❌ REJECTING: Exact name match with existing YC company "${company.name}"`);
+              return this.createRejectionResponse(company, 'EXACT_NAME_MATCH', {
+                nameSimilarity: Math.round(nameSimilarity * 100),
+                problemSimilarity: Math.round(problemSimilarity * 100),
+                reason: `Your application uses the exact same name "${userApplication.title}" as existing Y Combinator company "${company.name}". This is not allowed regardless of the business concept.`
+              }, userApplication);
+            }
+            
+            // For high similarity names (but not exact), reject if problem similarity is also high
+            // For very high similarity names (>95%), reject if problem similarity is >10%
+            // For high similarity names (85-95%), reject if problem similarity is >30%
+            const rejectionThreshold = nameSimilarity > 0.95 ? 0.1 : 0.3;
             
             if (problemSimilarity > rejectionThreshold) {
               return this.createRejectionResponse(company, 'NAME_AND_PROBLEM_MATCH', {
                 nameSimilarity: Math.round(nameSimilarity * 100),
                 problemSimilarity: Math.round(problemSimilarity * 100),
-                reason: `Same/similar name "${userApplication.title}" matches "${company.name}" AND the problem/description is also similar (${Math.round(problemSimilarity * 100)}% similarity).`
+                reason: `Similar name "${userApplication.title}" matches "${company.name}" (${Math.round(nameSimilarity * 100)}% similarity) AND the problem/description is also similar (${Math.round(problemSimilarity * 100)}% similarity).`
               }, userApplication);
             }
           }
@@ -610,9 +632,37 @@ Be precise and thorough in your analysis.
 
   // Helper method for creating rejection response
   createRejectionResponse(company, matchType, details, userApplication) {
-    const feedback = matchType === 'NAME_AND_PROBLEM_MATCH' ? 
-      `Your application title "${userApplication.title}" is very similar to "${company.name}" (${details.nameSimilarity}% name similarity) and your problem/description is also similar (${details.problemSimilarity}% similarity). This suggests you're working on the same or very similar concept.` :
-      `While your application has a different name, your business concept shows ${details.overallSimilarity}% similarity to "${company.name}". Your problem statement, solution approach, or business model appears too similar to this existing Y Combinator company.`;
+    let feedback;
+    let suggestions;
+    
+    if (matchType === 'EXACT_NAME_MATCH') {
+      feedback = `Your application uses the exact same name "${userApplication.title}" as the existing Y Combinator company "${company.name}". This is not allowed regardless of how different your business concept might be. Company names must be unique.`;
+      suggestions = [
+        "Choose a completely different name for your startup",
+        "Consider variations like adding prefixes, suffixes, or descriptive words",
+        "Brainstorm names that reflect your unique value proposition",
+        "Check domain availability for your new name",
+        "Ensure your new name doesn't conflict with other existing companies"
+      ];
+    } else if (matchType === 'NAME_AND_PROBLEM_MATCH') {
+      feedback = `Your application title "${userApplication.title}" is very similar to "${company.name}" (${details.nameSimilarity}% name similarity) and your problem/description is also similar (${details.problemSimilarity}% similarity). This suggests you're working on the same or very similar concept.`;
+      suggestions = [
+        `Research ${company.name}'s current offerings and identify clear gaps or limitations`,
+        `Focus on a specific market segment or use case that ${company.name} doesn't serve`,
+        "Develop a fundamentally different technical approach or solution",
+        "Consider targeting a different geographic market or customer segment",
+        "Pivot to solve a related but different problem in the same industry"
+      ];
+    } else {
+      feedback = `While your application has a different name, your business concept shows ${details.overallSimilarity}% similarity to "${company.name}". Your problem statement, solution approach, or business model appears too similar to this existing Y Combinator company.`;
+      suggestions = [
+        `Research ${company.name}'s current offerings and identify clear gaps or limitations`,
+        `Focus on a specific market segment or use case that ${company.name} doesn't serve`,
+        "Develop a fundamentally different technical approach or solution",
+        "Consider targeting a different geographic market or customer segment",
+        "Pivot to solve a related but different problem in the same industry"
+      ];
+    }
     
     return {
       content: [
@@ -620,26 +670,20 @@ Be precise and thorough in your analysis.
           type: 'text',
           text: JSON.stringify({
             isSimilar: true,
-            similarityScore: matchType === 'NAME_AND_PROBLEM_MATCH' ? 0.95 : details.overallSimilarity / 100,
+            similarityScore: matchType === 'EXACT_NAME_MATCH' ? 1.0 : (matchType === 'NAME_AND_PROBLEM_MATCH' ? 0.95 : details.overallSimilarity / 100),
             mostSimilarCompany: {
               name: company.name,
               reason: details.reason
             },
             analysis: {
-              titleSimilarity: matchType === 'NAME_AND_PROBLEM_MATCH' ? `${details.nameSimilarity}% - Very high name similarity` : "No significant name similarity",
+              titleSimilarity: matchType === 'EXACT_NAME_MATCH' ? "100% - Exact name match" : (matchType === 'NAME_AND_PROBLEM_MATCH' ? `${details.nameSimilarity}% - Very high name similarity` : "No significant name similarity"),
               problemSimilarity: `${details.problemSimilarity || 0}% similarity in problem statements`,
               solutionSimilarity: `${details.solutionSimilarity || 0}% similarity in proposed solutions`,
               businessModelSimilarity: `${details.businessModelSimilarity || 0}% similarity in business models`
             },
             recommendation: "REJECT",
             feedback,
-            suggestions: [
-              `Research ${company.name}'s current offerings and identify clear gaps or limitations`,
-              "Focus on a specific market segment or use case that ${company.name} doesn't serve",
-              "Develop a fundamentally different approach or technology to solve the same problem",
-              "Consider targeting a different customer base (B2B vs B2C, different industries)",
-              "Pivot to solve a related but different problem in the same space"
-            ]
+            suggestions
           }, null, 2)
         }
       ]

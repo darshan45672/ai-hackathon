@@ -102,9 +102,12 @@ services:
       - LOG_LEVEL=${LOG_LEVEL}
       - DEBUG_MODE=${DEBUG_MODE}
       - MOCK_EXTERNAL_APIS=${MOCK_EXTERNAL_APIS}
+      - CONTAINER_ENV=true
     volumes:
       # Mount source code for hot reload (optional)
       - ./ai/src:/app/src:Z
+      # Mount MCP server for external reviews
+      - ./mcp-server:/app/mcp-server:Z
     ports:
       - "3002:3002"
       - "3003:3003"

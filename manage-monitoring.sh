@@ -54,6 +54,29 @@ start_services() {
     check_health
 }
 
+
+build_services() {
+    echo_info "Building AI Hackathon platform with monitoring..."
+    
+    # Check if .env.development exists
+    if [ ! -f ".env.development" ]; then
+        if [ -f ".env" ]; then
+            echo_warn ".env.development not found, creating from .env"
+            cp .env .env.development
+        else
+            echo_error ".env.development file is required. Please create it from .env.template"
+            exit 1
+        fi
+    fi
+    
+    podman-compose -f $COMPOSE_FILE build
+    
+    echo_info "Waiting for services to build..."
+    sleep 10
+    
+    start_services
+}
+
 # Function to stop all services
 stop_services() {
     echo_info "Stopping AI Hackathon platform..."
@@ -208,6 +231,11 @@ cleanup_all() {
 case "${1:-help}" in
     start)
         start_services
+        echo ""
+        show_urls
+        ;;
+    build)
+        build_services
         echo ""
         show_urls
         ;;
