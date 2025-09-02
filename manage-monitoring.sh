@@ -71,7 +71,7 @@ build_services() {
     
     podman-compose -f $COMPOSE_FILE build
     
-    echo_info "Waiting for services to build..."
+    echo_info "Waiting for services to Start..."
     sleep 10
     
     start_services

@@ -203,6 +203,7 @@ class ExternalReviewMCPServer {
   }
 
   async analyzeIdeaSimilarity(args) {
+    let ycCompanies = [];
     try {
       const { userApplication, externalData } = args;
       
@@ -215,6 +216,52 @@ class ExternalReviewMCPServer {
         hasExternalData: !!externalData,
         ycCompaniesCount: externalData?.ycCompanies?.length || 0
       }, null, 2));
+
+      // Fetch YC companies if not provided
+      ycCompanies = externalData?.ycCompanies || [];
+      if (ycCompanies.length === 0) {
+        console.log('📡 Fetching YC companies from API...');
+        try {
+          const ycResponse = await this.fetchYCCompanies({ forSimilarityAnalysis: true });
+          ycCompanies = ycResponse.content?.[0]?.text ? JSON.parse(ycResponse.content[0].text) : [];
+          console.log(`📊 Fetched ${ycCompanies.length} YC companies`);
+        } catch (fetchError) {
+          console.error('⚠️ Failed to fetch YC companies:', fetchError.message);
+          ycCompanies = [];
+        }
+      }
+
+      // PRIORITY CHECK: Exact YC Company Match Detection
+      console.log('🔍 PRIORITY CHECK: Looking for exact YC company matches...');
+      if (ycCompanies.length > 0) {
+        console.log(`🔍 Checking "${userApplication.title}" against ${ycCompanies.length} YC companies`);
+        
+        const normalizedUserTitle = userApplication.title.toLowerCase().trim();
+        console.log(`🔍 Normalized user title: "${normalizedUserTitle}"`);
+        
+        for (const company of ycCompanies) {
+          const normalizedCompanyName = company.name.toLowerCase().trim();
+          console.log(`🔍 Comparing with YC company: "${normalizedCompanyName}"`);
+          
+          if (normalizedUserTitle === normalizedCompanyName) {
+            console.log(`🚨 EXACT MATCH FOUND: "${userApplication.title}" matches "${company.name}"`);
+            return this.createRejectionResponse(company, 'EXACT_YC_COMPANY_MATCH', {
+              nameSimilarity: 100,
+              problemSimilarity: 0,
+              reason: `Your application title "${userApplication.title}" is identical to existing Y Combinator company "${company.name}" from ${company.batch || 'unknown batch'}. This company already exists in the YC portfolio.`,
+              companyDetails: {
+                name: company.name,
+                batch: company.batch,
+                status: company.status,
+                oneLiner: company.oneLiner,
+                website: company.website,
+                industry: company.industry
+              }
+            }, userApplication);
+          }
+        }
+        console.log('✅ No exact YC company matches found, proceeding with similarity analysis...');
+      }
       
       // Check if we have a valid Gemini API key
       const hasValidApiKey = process.env.GEMINI_API_KEY && 
@@ -224,7 +271,7 @@ class ExternalReviewMCPServer {
       if (!hasValidApiKey) {
         console.error('⚠️ No valid Gemini API key found. Using fallback similarity detection.');
         // Use fallback similarity detection
-        return this.fallbackSimilarityAnalysis(userApplication, externalData.ycCompanies);
+        return this.fallbackSimilarityAnalysis(userApplication, ycCompanies);
       }
       
       // Create comprehensive prompt for Gemini
@@ -242,7 +289,7 @@ Target Market: ${userApplication.targetMarket || 'Not specified'}
 Business Model: ${userApplication.businessModel || 'Not specified'}
 
 EXISTING Y COMBINATOR COMPANIES:
-${externalData.ycCompanies.map(company => `
+${ycCompanies.map(company => `
 - Company: ${company.name}
   One-liner: ${company.oneLiner}
   Description: ${company.description}
@@ -303,7 +350,7 @@ Be precise and thorough in your analysis.
       } catch (parseError) {
         // Fallback if JSON parsing fails
         console.error('⚠️ Failed to parse Gemini response. Using fallback analysis.');
-        return this.fallbackSimilarityAnalysis(userApplication, externalData.ycCompanies);
+        return this.fallbackSimilarityAnalysis(userApplication, ycCompanies);
       }
 
       return {
@@ -318,7 +365,7 @@ Be precise and thorough in your analysis.
     } catch (error) {
       console.error('❌ Gemini API Error:', error.message);
       // Use fallback instead of generic approval
-      return this.fallbackSimilarityAnalysis(args.userApplication, args.externalData.ycCompanies);
+      return this.fallbackSimilarityAnalysis(args.userApplication, ycCompanies);
     }
   }
 
@@ -338,7 +385,50 @@ Be precise and thorough in your analysis.
       console.log(`📝 Problem: "${userApplication.problemStatement}"`);
       console.log(`💡 Solution: "${userApplication.proposedSolution}"`);
       
-      // Step 1: Check for name similarity
+      // PRIORITY CHECK: First check for exact YC company matches
+      console.log('\n🚨 PRIORITY CHECK: Looking for exact YC company matches...');
+      console.log(`🔍 User title: "${userTitle}"`);
+      
+      for (const company of ycCompanies) {
+        const companyName = company.name.toLowerCase().trim();
+        const formerNames = (company.formerNames || []).map(name => name.toLowerCase().trim());
+        const allNames = [companyName, ...formerNames];
+        
+        for (const name of allNames) {
+          const normalizedUserTitle = userTitle.replace(/[^a-z0-9]/g, '');
+          const normalizedCompanyName = name.replace(/[^a-z0-9]/g, '');
+          
+          console.log(`🔍 Checking: "${userTitle}" vs "${name}" | normalized: "${normalizedUserTitle}" vs "${normalizedCompanyName}"`);
+          
+          // Check for EXACT matches first (before any similarity analysis)
+          const isExactMatch = normalizedUserTitle === normalizedCompanyName || userTitle === name;
+          
+          if (isExactMatch) {
+            console.log(`🚨 EXACT YC COMPANY MATCH FOUND: "${userApplication.title}" matches "${company.name}" (${company.batch || 'Unknown batch'})`);
+            console.log(`📋 Company Details: ${company.oneLiner || 'No description'}`);
+            console.log(`🌐 Website: ${company.website || 'No website'}`);
+            console.log(`📊 Status: ${company.status || 'Unknown'}`);
+            
+            return this.createRejectionResponse(company, 'EXACT_YC_COMPANY_MATCH', {
+              nameSimilarity: 100,
+              problemSimilarity: 0,
+              reason: `Your application title "${userApplication.title}" is identical to existing Y Combinator company "${company.name}" from ${company.batch || 'unknown batch'}. This company already exists in the YC portfolio.`,
+              companyDetails: {
+                name: company.name,
+                batch: company.batch,
+                status: company.status,
+                oneLiner: company.oneLiner,
+                website: company.website,
+                industry: company.industry
+              }
+            }, userApplication);
+          }
+        }
+      }
+      
+      console.log('✅ No exact YC company matches found. Proceeding to similarity analysis...');
+      
+      // Step 1: Check for name similarity (non-exact matches)
       console.log('\n🎯 Step 1: Checking name similarity...');
       for (const company of ycCompanies) {
         const companyName = company.name.toLowerCase();
@@ -402,6 +492,7 @@ Be precise and thorough in your analysis.
       let highestSimilarity = 0;
       let mostSimilarCompany = null;
       let similarityDetails = null;
+      let similarCompanies = []; // Track multiple similar companies
       
       for (let i = 0; i < ycCompanies.length; i++) {
         const company = ycCompanies[i];
@@ -416,6 +507,22 @@ Be precise and thorough in your analysis.
         // Calculate overall business concept similarity
         const overallSimilarity = this.calculateOverallBusinessSimilarity(analysis);
         
+        // Collect companies with significant similarity (>25%)
+        if (overallSimilarity > 0.25) {
+          similarCompanies.push({
+            name: company.name,
+            batch: company.batch,
+            oneLiner: company.oneLiner,
+            industry: company.industry,
+            status: company.status,
+            website: company.website,
+            similarityScore: Math.round(overallSimilarity * 100),
+            problemSimilarity: Math.round(analysis.problemSimilarity * 100),
+            solutionSimilarity: Math.round(analysis.solutionSimilarity * 100),
+            businessModelSimilarity: Math.round(analysis.businessModelSimilarity * 100)
+          });
+        }
+        
         if (overallSimilarity > highestSimilarity) {
           highestSimilarity = overallSimilarity;
           mostSimilarCompany = company;
@@ -423,7 +530,11 @@ Be precise and thorough in your analysis.
         }
       }
       
+      // Sort similar companies by similarity score
+      similarCompanies.sort((a, b) => b.similarityScore - a.similarityScore);
+      
       console.log(`🎯 Analysis complete. Highest business similarity: ${Math.round(highestSimilarity * 100)}% with ${mostSimilarCompany?.name || 'no company'}`);
+      console.log(`📊 Found ${similarCompanies.length} companies with >25% similarity`);
       
       // Step 3: Make decision based on business concept similarity
       // Reject if business concept similarity is high (>40%)
@@ -437,7 +548,8 @@ Be precise and thorough in your analysis.
           problemSimilarity: Math.round(similarityDetails.problemSimilarity * 100),
           solutionSimilarity: Math.round(similarityDetails.solutionSimilarity * 100),
           businessModelSimilarity: Math.round(similarityDetails.businessModelSimilarity * 100),
-          reason: `Different name but same/similar business concept. Your problem statement, solution approach, or business model is too similar to ${mostSimilarCompany.name}.`
+          reason: `Different name but same/similar business concept. Your problem statement, solution approach, or business model is too similar to ${mostSimilarCompany.name}.`,
+          similarCompanies: similarCompanies.slice(0, 5) // Include top 5 similar companies
         }, userApplication);
       }
       
@@ -635,7 +747,16 @@ Be precise and thorough in your analysis.
     let feedback;
     let suggestions;
     
-    if (matchType === 'EXACT_NAME_MATCH') {
+    if (matchType === 'EXACT_YC_COMPANY_MATCH') {
+      feedback = `Your application title "${userApplication.title}" is identical to existing Y Combinator company "${company.name}" from ${details.companyDetails.batch || 'unknown batch'}. This company is currently ${details.companyDetails.status || 'active'} and describes itself as: "${details.companyDetails.oneLiner || 'No description available'}". You cannot submit an application with the same name as an existing YC company.`;
+      suggestions = [
+        "Choose a completely different name for your startup that doesn't conflict with existing YC companies",
+        `Visit ${details.companyDetails.website || 'the company website'} to understand what ${company.name} already offers`,
+        "Consider how your approach differs from the existing company and reflect that in your naming",
+        "Research the entire YC portfolio to ensure your chosen name is unique",
+        "Focus on your unique value proposition when selecting a new name"
+      ];
+    } else if (matchType === 'EXACT_NAME_MATCH') {
       feedback = `Your application uses the exact same name "${userApplication.title}" as the existing Y Combinator company "${company.name}". This is not allowed regardless of how different your business concept might be. Company names must be unique.`;
       suggestions = [
         "Choose a completely different name for your startup",
@@ -654,13 +775,31 @@ Be precise and thorough in your analysis.
         "Pivot to solve a related but different problem in the same industry"
       ];
     } else {
-      feedback = `While your application has a different name, your business concept shows ${details.overallSimilarity}% similarity to "${company.name}". Your problem statement, solution approach, or business model appears too similar to this existing Y Combinator company.`;
+      // Business concept match - include detailed similar companies information
+      let similarCompaniesText = '';
+      if (details.similarCompanies && details.similarCompanies.length > 0) {
+        similarCompaniesText = '\n\n**Similar Y Combinator Companies:**\n';
+        details.similarCompanies.forEach((comp, index) => {
+          similarCompaniesText += `\n${index + 1}. **${comp.name}** (${comp.batch || 'Unknown batch'}) - ${comp.similarityScore}% similar\n`;
+          similarCompaniesText += `   • Description: ${comp.oneLiner || 'No description available'}\n`;
+          similarCompaniesText += `   • Industry: ${comp.industry || 'Unknown'}\n`;
+          similarCompaniesText += `   • Status: ${comp.status || 'Unknown'}\n`;
+          if (comp.website) {
+            similarCompaniesText += `   • Website: ${comp.website}\n`;
+          }
+          similarCompaniesText += `   • Similarity breakdown: Problem (${comp.problemSimilarity}%), Solution (${comp.solutionSimilarity}%), Business Model (${comp.businessModelSimilarity}%)\n`;
+        });
+      }
+      
+      feedback = `While your application has a different name, your business concept shows ${details.overallSimilarity}% similarity to "${company.name}". Your problem statement, solution approach, or business model appears too similar to existing Y Combinator companies.${similarCompaniesText}`;
+      
       suggestions = [
-        `Research ${company.name}'s current offerings and identify clear gaps or limitations`,
-        `Focus on a specific market segment or use case that ${company.name} doesn't serve`,
+        `Research the companies listed above to understand their current offerings and identify clear gaps or limitations`,
+        `Focus on a specific market segment or use case that these companies don't serve`,
         "Develop a fundamentally different technical approach or solution",
         "Consider targeting a different geographic market or customer segment",
-        "Pivot to solve a related but different problem in the same industry"
+        "Pivot to solve a related but different problem in the same industry",
+        "Study the Y Combinator portfolio to avoid overlapping with existing companies"
       ];
     }
     
@@ -675,6 +814,7 @@ Be precise and thorough in your analysis.
               name: company.name,
               reason: details.reason
             },
+            similarCompanies: details.similarCompanies || [], // Include the list of similar companies
             analysis: {
               titleSimilarity: matchType === 'EXACT_NAME_MATCH' ? "100% - Exact name match" : (matchType === 'NAME_AND_PROBLEM_MATCH' ? `${details.nameSimilarity}% - Very high name similarity` : "No significant name similarity"),
               problemSimilarity: `${details.problemSimilarity || 0}% similarity in problem statements`,
