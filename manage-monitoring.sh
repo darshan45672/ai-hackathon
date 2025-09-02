@@ -69,7 +69,7 @@ build_services() {
         fi
     fi
     
-    podman-compose -f $COMPOSE_FILE build
+    podman-compose -f $COMPOSE_FILE build --no-cache
     
     echo_info "Waiting for services to Start..."
     sleep 10

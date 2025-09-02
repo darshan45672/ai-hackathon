@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsArray, IsOptional, IsInt, Min, Max, IsUrl, IsEnum } from 'class-validator';
+import { IsString, IsNotEmpty, IsArray, IsOptional, IsInt, Min, Max, IsUrl, IsEnum, IsNumber, IsPositive } from 'class-validator';
 
 export class CreateApplicationDto {
   @IsString()
@@ -37,6 +37,11 @@ export class CreateApplicationDto {
   @IsOptional()
   @IsUrl()
   demoUrl?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @IsPositive()
+  estimatedCost?: number;
 
   @IsOptional()
   @IsEnum(['DRAFT', 'SUBMITTED'])

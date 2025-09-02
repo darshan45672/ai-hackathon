@@ -111,6 +111,52 @@ export class MCPClientService {
     }
   }
 
+  async analyzeCostFeasibility(application: any): Promise<any> {
+    try {
+      this.logger.log('Starting cost feasibility analysis via MCP');
+
+      if (!this.mcpServerPath || !existsSync(this.mcpServerPath)) {
+        this.logger.error('MCP server not found - using fallback cost analysis');
+        return this.performFallbackCostAnalysis(application);
+      }
+      
+      const mcpRequest = {
+        jsonrpc: '2.0',
+        id: Date.now(),
+        method: 'tools/call',
+        params: {
+          name: 'analyze_cost_feasibility',
+          arguments: {
+            application
+          }
+        }
+      };
+
+      const result = await this.callMCPServer(mcpRequest);
+      
+      if (result.error) {
+        throw new Error(result.error.message || 'MCP cost analysis failed');
+      }
+
+      const analysisText = result.result?.content?.[0]?.text;
+      if (!analysisText) {
+        throw new Error('No cost analysis result from MCP server');
+      }
+
+      const analysis = JSON.parse(analysisText);
+      this.logger.log(`MCP cost analysis completed: Feasible=${analysis.isFeasible}`);
+      
+      return analysis;
+
+    } catch (error) {
+      this.logger.error('Error in MCP cost analysis:', error);
+      
+      // Use fallback analysis instead of failing
+      this.logger.warn('🔄 MCP cost analysis failed, using fallback analysis');
+      return this.performFallbackCostAnalysis(application);
+    }
+  }
+
   async fetchYCCompanies(category?: string, limit?: number): Promise<any[]> {
     try {
       this.logger.log('Fetching YC companies from MCP server');
@@ -219,6 +265,86 @@ export class MCPClientService {
       mcpProcess.stdin.write(JSON.stringify(request) + '\n');
       mcpProcess.stdin.end();
     });
+  }
+
+  private performFallbackCostAnalysis(application: any): any {
+    this.logger.log('Performing fallback cost analysis');
+
+    const estimatedCost = application.estimatedCost || 0;
+    const teamSize = application.teamSize || 1;
+    const techStack = application.techStack || [];
+    const description = (application.description || '').toLowerCase();
+    const solution = (application.solution || '').toLowerCase();
+
+    // Assess complexity
+    const complexityFactors = {
+      high: ['blockchain', 'machine learning', 'ai', 'real-time', 'distributed', 'microservices', 'kubernetes', 'big data', 'ar', 'vr'],
+      medium: ['react', 'vue', 'angular', 'node.js', 'python', 'api', 'database', 'authentication', 'payment', 'mobile'],
+      low: ['html', 'css', 'javascript', 'static', 'simple', 'basic']
+    };
+
+    let complexity = 'low';
+    const allText = `${description} ${solution} ${techStack.join(' ')}`.toLowerCase();
+    
+    if (complexityFactors.high.some(factor => allText.includes(factor))) {
+      complexity = 'high';
+    } else if (complexityFactors.medium.some(factor => allText.includes(factor))) {
+      complexity = 'medium';
+    }
+
+    // Cost estimation
+    const hourlyRate = 75;
+    const baseHours = complexity === 'high' ? 800 : complexity === 'medium' ? 400 : 200;
+    const teamAdjustment = teamSize > 3 ? 1.2 : 1.0;
+
+    const developmentCost = baseHours * hourlyRate * teamAdjustment;
+    const infrastructureCost = complexity === 'high' ? 1200 : complexity === 'medium' ? 600 : 300;
+    
+    let servicesCost = 0;
+    if (allText.includes('payment')) servicesCost += 200;
+    if (allText.includes('auth')) servicesCost += 100;
+    if (allText.includes('email')) servicesCost += 50;
+    if (allText.includes('api')) servicesCost += 150;
+    
+    const operationalCost = teamSize * 100 + (complexity === 'high' ? 500 : complexity === 'medium' ? 300 : 200);
+    const subtotal = developmentCost + infrastructureCost + servicesCost + operationalCost;
+    const contingency = subtotal * 0.2;
+    const totalEstimatedCost = subtotal + contingency;
+    
+    const budgetVariance = totalEstimatedCost - estimatedCost;
+    const budgetVariancePercentage = estimatedCost > 0 ? (budgetVariance / estimatedCost) * 100 : 100;
+    const isFeasible = estimatedCost >= totalEstimatedCost * 0.8;
+    const feasibilityScore = estimatedCost > 0 ? Math.max(0, Math.min(1, estimatedCost / totalEstimatedCost)) : 0.5;
+
+    return {
+      costBreakdown: {
+        development: Math.round(developmentCost),
+        infrastructure: Math.round(infrastructureCost),
+        thirdPartyServices: Math.round(servicesCost),
+        operational: Math.round(operationalCost),
+        contingency: Math.round(contingency)
+      },
+      totalEstimatedCost: Math.round(totalEstimatedCost),
+      requestedBudget: estimatedCost,
+      budgetVariance: Math.round(budgetVariance),
+      budgetVariancePercentage: Math.round(budgetVariancePercentage * 100) / 100,
+      isFeasible,
+      feasibilityScore: Math.round(feasibilityScore * 100) / 100,
+      recommendation: isFeasible 
+        ? `Budget appears adequate for ${complexity} complexity project.`
+        : `Budget insufficient. Consider increasing budget by $${Math.round(Math.abs(budgetVariance))}.`,
+      detailedAnalysis: {
+        complexityAssessment: complexity,
+        developmentTimeEstimate: complexity === 'high' ? '4-6 months' : complexity === 'medium' ? '2-4 months' : '1-3 months',
+        mainCostDrivers: ['Development team costs', 'Infrastructure setup'],
+        costOptimizationSuggestions: ['Use open-source alternatives', 'Start with MVP'],
+        riskFactors: ['Scope creep', 'Integration complexity'],
+        scalingConsiderations: 'Budget includes 6 months operational costs'
+      },
+      analysisType: 'FALLBACK',
+      confidence: 'MEDIUM',
+      error: false
+    };
   }
 
   /**

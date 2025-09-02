@@ -49,7 +49,8 @@ function SubmitContent() {
     teamSize: "",
     teamMembers: [""],
     githubRepo: "",
-    demoUrl: ""
+    demoUrl: "",
+    estimatedCost: ""
   });
 
   const [newTech, setNewTech] = useState("");
@@ -175,6 +176,11 @@ function SubmitContent() {
         return;
       }
 
+      if (!formData.estimatedCost || parseFloat(formData.estimatedCost) <= 0) {
+        toast.error("Please enter a valid estimated budget");
+        return;
+      }
+
       const minMembers = getMinTeamMembers();
       const filledMembers = formData.teamMembers.filter(member => member.trim());
       
@@ -210,6 +216,7 @@ function SubmitContent() {
         teamMembers: formData.teamMembers.filter(member => member.trim()),
         githubRepo: formData.githubRepo.trim() || undefined,
         demoUrl: formData.demoUrl.trim() || undefined,
+        estimatedCost: formData.estimatedCost ? parseFloat(formData.estimatedCost) : undefined,
         status: isDraft ? 'DRAFT' : 'SUBMITTED',
       };
 
@@ -384,6 +391,22 @@ function SubmitContent() {
                     onChange={(e) => setFormData(prev => ({ ...prev, demoUrl: e.target.value }))}
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="estimatedCost">Estimated Budget (USD) *</Label>
+                <Input
+                  id="estimatedCost"
+                  type="number"
+                  placeholder="e.g., 10000"
+                  value={formData.estimatedCost}
+                  onChange={(e) => setFormData(prev => ({ ...prev, estimatedCost: e.target.value }))}
+                  min="0"
+                  step="100"
+                />
+                <p className="text-sm text-muted-foreground">
+                  Enter the estimated budget needed to implement your project (including development, infrastructure, and operational costs)
+                </p>
               </div>
             </CardContent>
           </Card>

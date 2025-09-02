@@ -180,6 +180,31 @@ class ExternalReviewMCPServer {
                 }
               }
             }
+          },
+          {
+            name: 'analyze_cost_feasibility',
+            description: 'Analyze the cost feasibility of a startup project using AI to provide detailed budget assessment',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                application: {
+                  type: 'object',
+                  properties: {
+                    title: { type: 'string', description: 'Project title' },
+                    description: { type: 'string', description: 'Project description' },
+                    problemStatement: { type: 'string', description: 'Problem being solved' },
+                    solution: { type: 'string', description: 'Proposed solution' },
+                    techStack: { type: 'array', items: { type: 'string' }, description: 'Technologies used' },
+                    teamSize: { type: 'number', description: 'Team size' },
+                    estimatedCost: { type: 'number', description: 'Requested budget' },
+                    targetMarket: { type: 'string', description: 'Target market segment' },
+                    businessModel: { type: 'string', description: 'Business model' }
+                  },
+                  required: ['title', 'description', 'problemStatement', 'solution', 'techStack', 'teamSize', 'estimatedCost']
+                }
+              },
+              required: ['application']
+            }
           }
         ]
       };
@@ -196,6 +221,8 @@ class ExternalReviewMCPServer {
           return this.fetchYCCompanies(request.params.arguments);
         case 'fetch_internal_applications':
           return this.fetchInternalApplications(request.params.arguments);
+        case 'analyze_cost_feasibility':
+          return this.analyzeCostFeasibility(request.params.arguments);
         default:
           throw new Error(`Unknown tool: ${request.params.name}`);
       }
@@ -1701,6 +1728,296 @@ Be precise and thorough in your analysis.
               fetchedAt: new Date().toISOString(),
               source: 'Internal Database (Failed)',
               analysisMode: 'ERROR'
+            }, null, 2)
+          }
+        ],
+        isError: true
+      };
+    }
+  }
+
+  async analyzeCostFeasibility(args) {
+    try {
+      const { application } = args;
+      
+      console.log('💰 COST ANALYSIS STARTED');
+      console.log('📋 Application Data:', JSON.stringify({
+        title: application.title,
+        estimatedCost: application.estimatedCost,
+        teamSize: application.teamSize,
+        techStack: application.techStack,
+        description: application.description?.substring(0, 100) + '...'
+      }, null, 2));
+
+      // Check if we have a valid Gemini API key
+      const hasValidApiKey = process.env.GEMINI_API_KEY && 
+                           process.env.GEMINI_API_KEY !== 'your-gemini-api-key' && 
+                           process.env.GEMINI_API_KEY !== 'test-key';
+      
+      if (!hasValidApiKey) {
+        console.error('⚠️ No valid Gemini API key found. Using fallback cost analysis.');
+        return this.fallbackCostAnalysis(application);
+      }
+
+      // Create comprehensive prompt for Gemini
+      const prompt = `
+You are an expert startup financial analyst and cost estimation specialist. Your task is to evaluate whether a startup project can be implemented within the requested budget.
+
+PROJECT DETAILS:
+Title: ${application.title}
+Description: ${application.description}
+Problem Statement: ${application.problemStatement}
+Proposed Solution: ${application.solution}
+Tech Stack: ${application.techStack.join(', ')}
+Team Size: ${application.teamSize} people
+Requested Budget: $${application.estimatedCost}
+Target Market: ${application.targetMarket || 'Not specified'}
+Business Model: ${application.businessModel || 'Not specified'}
+
+COST ANALYSIS FRAMEWORK:
+Analyze and estimate costs across these categories:
+
+1. DEVELOPMENT COSTS:
+   - Developer salaries/hourly rates based on tech stack complexity
+   - Project duration estimation (MVP development timeline)
+   - Team coordination overhead
+   - Quality assurance and testing
+   - Documentation and deployment
+
+2. INFRASTRUCTURE COSTS:
+   - Cloud hosting and server costs
+   - Database hosting and storage
+   - CDN and static asset delivery
+   - SSL certificates and domain costs
+   - Monitoring and logging services
+
+3. THIRD-PARTY SERVICES:
+   - Payment processing APIs
+   - Authentication services
+   - Email/SMS notification services
+   - Analytics and tracking tools
+   - External API integrations
+   - Security and compliance tools
+
+4. OPERATIONAL COSTS:
+   - Project management tools
+   - Communication and collaboration tools
+   - Legal and compliance requirements
+   - Marketing and user acquisition (initial)
+   - Customer support setup
+
+5. CONTINGENCY & SCALING:
+   - Buffer for unexpected costs (typically 15-25%)
+   - Initial scaling considerations
+   - Post-launch maintenance budget
+
+COST ESTIMATION GUIDELINES:
+- Use current market rates for developers in the US/global remote market
+- Consider the complexity indicated by the tech stack
+- Factor in team size for coordination overhead
+- Estimate for MVP development (3-6 months typical timeline)
+- Include 6 months of operational costs
+- Be realistic about hidden costs and dependencies
+
+Please provide a JSON response with:
+{
+  "costBreakdown": {
+    "development": number,
+    "infrastructure": number,
+    "thirdPartyServices": number,
+    "operational": number,
+    "contingency": number
+  },
+  "totalEstimatedCost": number,
+  "requestedBudget": number,
+  "budgetVariance": number,
+  "budgetVariancePercentage": number,
+  "isFeasible": boolean,
+  "feasibilityScore": number,
+  "recommendation": "string",
+  "detailedAnalysis": {
+    "complexityAssessment": "low|medium|high",
+    "developmentTimeEstimate": "string",
+    "mainCostDrivers": ["array of main cost factors"],
+    "costOptimizationSuggestions": ["array of suggestions to reduce costs"],
+    "riskFactors": ["array of cost-related risks"],
+    "scalingConsiderations": "string"
+  },
+  "budgetRecommendation": {
+    "minimumViableBudget": number,
+    "recommendedBudget": number,
+    "stretchBudget": number,
+    "reasoning": "string"
+  }
+}
+
+Be thorough, realistic, and provide actionable insights for budget planning.
+`;
+
+      // Call Gemini AI
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+
+      // Try to parse JSON from the response
+      let analysis;
+      try {
+        // Extract JSON from the response (Gemini might wrap it in markdown)
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        analysis = JSON.parse(jsonMatch ? jsonMatch[0] : text);
+      } catch (parseError) {
+        // Fallback if JSON parsing fails
+        console.error('⚠️ Failed to parse Gemini response. Using fallback analysis.');
+        return this.fallbackCostAnalysis(application);
+      }
+
+      // Validate and enhance the analysis
+      analysis.timestamp = new Date().toISOString();
+      analysis.analysisType = 'AI_POWERED';
+      analysis.confidence = 'HIGH';
+
+      console.log(`💰 Cost analysis completed. Feasible: ${analysis.isFeasible}, Score: ${analysis.feasibilityScore}`);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(analysis, null, 2)
+          }
+        ]
+      };
+
+    } catch (error) {
+      console.error('❌ Gemini API Error:', error.message);
+      // Use fallback instead of generic error
+      return this.fallbackCostAnalysis(args.application);
+    }
+  }
+
+  fallbackCostAnalysis(application) {
+    try {
+      console.log('🔧 Using fallback cost analysis...');
+
+      const estimatedCost = application.estimatedCost;
+      const techStack = application.techStack;
+      const teamSize = application.teamSize;
+      const description = application.description.toLowerCase();
+      const solution = application.solution.toLowerCase();
+
+      // Assess complexity based on tech stack and description
+      const complexityFactors = {
+        high: ['blockchain', 'machine learning', 'ai', 'real-time', 'distributed', 'microservices', 'kubernetes', 'big data', 'ar', 'vr'],
+        medium: ['react', 'vue', 'angular', 'node.js', 'python', 'api', 'database', 'authentication', 'payment', 'mobile'],
+        low: ['html', 'css', 'javascript', 'static', 'simple', 'basic']
+      };
+
+      let complexity = 'low';
+      const allText = `${description} ${solution} ${techStack.join(' ')}`.toLowerCase();
+      
+      if (complexityFactors.high.some(factor => allText.includes(factor))) {
+        complexity = 'high';
+      } else if (complexityFactors.medium.some(factor => allText.includes(factor))) {
+        complexity = 'medium';
+      }
+
+      // Cost estimation based on complexity and team size
+      const hourlyRate = 75; // Average developer rate
+      const baseHours = complexity === 'high' ? 800 : complexity === 'medium' ? 400 : 200;
+      const teamAdjustment = teamSize > 3 ? 1.2 : 1.0; // Coordination overhead
+
+      const developmentCost = baseHours * hourlyRate * teamAdjustment;
+      
+      // Infrastructure costs (6 months)
+      const infraCost = complexity === 'high' ? 1200 : complexity === 'medium' ? 600 : 300;
+      
+      // Third-party services
+      const servicesText = allText;
+      let servicesCost = 0;
+      if (servicesText.includes('payment')) servicesCost += 200;
+      if (servicesText.includes('auth')) servicesCost += 100;
+      if (servicesText.includes('email')) servicesCost += 50;
+      if (servicesText.includes('sms')) servicesCost += 100;
+      if (servicesText.includes('api')) servicesCost += 150;
+      
+      // Operational costs
+      const operationalCost = teamSize * 100 + (complexity === 'high' ? 500 : complexity === 'medium' ? 300 : 200);
+      
+      // Contingency (20%)
+      const subtotal = developmentCost + infraCost + servicesCost + operationalCost;
+      const contingency = subtotal * 0.2;
+      
+      const totalEstimatedCost = subtotal + contingency;
+      const budgetVariance = totalEstimatedCost - estimatedCost;
+      const budgetVariancePercentage = estimatedCost > 0 ? (budgetVariance / estimatedCost) * 100 : 100;
+      const isFeasible = estimatedCost >= totalEstimatedCost * 0.8; // 20% tolerance
+      const feasibilityScore = estimatedCost > 0 ? Math.max(0, Math.min(1, estimatedCost / totalEstimatedCost)) : 0.5;
+
+      const analysis = {
+        costBreakdown: {
+          development: Math.round(developmentCost),
+          infrastructure: Math.round(infraCost),
+          thirdPartyServices: Math.round(servicesCost),
+          operational: Math.round(operationalCost),
+          contingency: Math.round(contingency)
+        },
+        totalEstimatedCost: Math.round(totalEstimatedCost),
+        requestedBudget: estimatedCost,
+        budgetVariance: Math.round(budgetVariance),
+        budgetVariancePercentage: Math.round(budgetVariancePercentage * 100) / 100,
+        isFeasible,
+        feasibilityScore: Math.round(feasibilityScore * 100) / 100,
+        recommendation: isFeasible 
+          ? `Budget appears adequate for ${complexity} complexity project. Estimated cost: $${Math.round(totalEstimatedCost)} vs requested: $${estimatedCost}.`
+          : `Budget insufficient. Estimated cost: $${Math.round(totalEstimatedCost)} vs requested: $${estimatedCost}. Consider increasing budget by $${Math.round(Math.abs(budgetVariance))} or reducing scope.`,
+        detailedAnalysis: {
+          complexityAssessment: complexity,
+          developmentTimeEstimate: complexity === 'high' ? '4-6 months' : complexity === 'medium' ? '2-4 months' : '1-3 months',
+          mainCostDrivers: ['Development team costs', 'Infrastructure setup', 'Third-party integrations'],
+          costOptimizationSuggestions: [
+            'Consider open-source alternatives for third-party services',
+            'Start with MVP and scale incrementally',
+            'Use cost-effective cloud solutions'
+          ],
+          riskFactors: ['Scope creep', 'Integration complexity', 'Market rate fluctuations'],
+          scalingConsiderations: 'Budget includes basic scaling for initial 6 months'
+        },
+        budgetRecommendation: {
+          minimumViableBudget: Math.round(totalEstimatedCost * 0.8),
+          recommendedBudget: Math.round(totalEstimatedCost),
+          stretchBudget: Math.round(totalEstimatedCost * 1.3),
+          reasoning: `Based on ${complexity} complexity assessment and ${teamSize} team members`
+        },
+        timestamp: new Date().toISOString(),
+        analysisType: 'RULE_BASED_FALLBACK',
+        confidence: 'MEDIUM'
+      };
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(analysis, null, 2)
+          }
+        ]
+      };
+
+    } catch (error) {
+      console.error('❌ Fallback cost analysis error:', error);
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              error: true,
+              errorMessage: error.message,
+              totalEstimatedCost: 0,
+              requestedBudget: application.estimatedCost || 0,
+              isFeasible: false,
+              feasibilityScore: 0,
+              recommendation: 'Cost analysis failed due to technical error. Manual review required.',
+              timestamp: new Date().toISOString(),
+              analysisType: 'ERROR'
             }, null, 2)
           }
         ],

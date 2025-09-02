@@ -1,11 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+import { MCPClientService } from '../mcp/mcp-client.service';
 
 @Injectable()
 export class CostReviewService {
   private readonly logger = new Logger(CostReviewService.name);
 
-  constructor(private readonly databaseService: DatabaseService) {}
+  constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly mcpClientService: MCPClientService
+  ) {}
 
   async reviewCostFeasibility(applicationId: string): Promise<void> {
     this.logger.log(`Starting cost feasibility review for application ${applicationId}`);
@@ -28,8 +32,8 @@ export class CostReviewService {
         },
       });
 
-      // Analyze cost feasibility
-      const costAnalysis = await this.analyzeCostFeasibility(application);
+      // Analyze cost feasibility using AI-powered MCP analysis
+      const costAnalysis = await this.analyzeCostFeasibilityWithAI(application);
       
       const metadata = {
         ...costAnalysis,
@@ -103,6 +107,46 @@ export class CostReviewService {
           processedAt: new Date(),
         },
       });
+    }
+  }
+
+  private async analyzeCostFeasibilityWithAI(application: any): Promise<any> {
+    try {
+      this.logger.log(`Starting AI-powered cost analysis for application ${application.id}`);
+
+      // Call MCP service for cost analysis
+      const costAnalysis = await this.mcpClientService.analyzeCostFeasibility({
+        title: application.title,
+        description: application.description,
+        problemStatement: application.problemStatement,
+        solution: application.solution,
+        techStack: application.techStack || [],
+        teamSize: application.teamSize || 1,
+        estimatedCost: application.estimatedCost || 0,
+        targetMarket: application.targetMarket || '',
+        businessModel: application.businessModel || ''
+      });
+
+      this.logger.log(`AI cost analysis completed: Feasible=${costAnalysis.isFeasible}, Score=${costAnalysis.feasibilityScore}`);
+      
+      return {
+        estimatedCosts: costAnalysis.costBreakdown,
+        totalEstimatedCost: costAnalysis.totalEstimatedCost,
+        requestedBudget: costAnalysis.requestedBudget,
+        costVariance: costAnalysis.budgetVariancePercentage,
+        isFeasible: costAnalysis.isFeasible,
+        feasibilityScore: costAnalysis.feasibilityScore,
+        recommendation: costAnalysis.recommendation,
+        costBreakdownDetails: costAnalysis.detailedAnalysis,
+        aiAnalysis: costAnalysis, // Include full AI analysis
+        analysisType: 'AI_POWERED'
+      };
+
+    } catch (error) {
+      this.logger.error('AI cost analysis failed, falling back to rule-based analysis:', error);
+      
+      // Fallback to original rule-based analysis
+      return this.analyzeCostFeasibility(application);
     }
   }
 
