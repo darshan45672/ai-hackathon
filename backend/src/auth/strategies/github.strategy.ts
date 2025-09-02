@@ -9,7 +9,7 @@ export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
     super({
       clientID: configService.get('GITHUB_CLIENT_ID') || '',
       clientSecret: configService.get('GITHUB_CLIENT_SECRET') || '',
-      callbackURL: '/api/auth/github/callback',
+      callbackURL: `${configService.get('FRONTEND_URL') || 'http://localhost'}/api/auth/github/callback`,
       scope: ['user:email'],
     });
   }

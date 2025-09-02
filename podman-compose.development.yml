@@ -68,6 +68,9 @@ services:
       start_period: 60s
     security_opt:
       - label=disable
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     deploy:
       resources:
         limits:

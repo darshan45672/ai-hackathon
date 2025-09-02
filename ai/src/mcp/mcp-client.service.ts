@@ -80,7 +80,7 @@ export class MCPClientService {
           arguments: {
             userApplication,
             externalData: {
-              ycCompanies
+              ycCompanies: [] // Let MCP server fetch the full YC company data
             }
           }
         }
