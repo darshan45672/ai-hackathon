@@ -13,6 +13,7 @@ import { ReviewsModule } from './reviews/reviews.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { WebSocketModule } from './websocket/websocket.module';
 import { HealthModule } from './health/health.module';
+import { CacheCustomModule } from './cache/cache.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { HealthModule } from './health/health.module';
       },
     }),
     DatabaseModule,
+    CacheCustomModule,
     AuthModule,
     UsersModule,
     ApplicationsModule,

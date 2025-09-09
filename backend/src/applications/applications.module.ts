@@ -6,9 +6,10 @@ import { AIServiceClient } from './ai-service-client.service';
 import { DatabaseModule } from '../database/database.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { WebSocketModule } from '../websocket/websocket.module';
+import { CacheCustomModule } from '../cache/cache.module';
 
 @Module({
-  imports: [DatabaseModule, NotificationsModule, WebSocketModule],
+  imports: [DatabaseModule, NotificationsModule, WebSocketModule, CacheCustomModule],
   controllers: [ApplicationsController],
   providers: [ApplicationsService, ApplicationsResolver, AIServiceClient],
   exports: [ApplicationsService],

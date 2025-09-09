@@ -1,18 +1,23 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AIServiceClient } from './ai-service-client.service';
 import { ApplicationStatusGateway } from '../websocket/application-status.gateway';
+import { CacheService } from '../cache/cache.service';
 import { CreateApplicationDto } from './dto/create-application.dto';
 import { UpdateApplicationDto } from './dto/update-application.dto';
+import { Application } from '../graphql/models';
 
 @Injectable()
 export class ApplicationsService {
+  private readonly logger = new Logger(ApplicationsService.name);
+
   constructor(
     private databaseService: DatabaseService,
     private notificationsService: NotificationsService,
     private aiServiceClient: AIServiceClient,
     private applicationStatusGateway: ApplicationStatusGateway,
+    private cacheService: CacheService,
   ) {}
 
   async create(createApplicationDto: CreateApplicationDto, userId: string) {
@@ -68,71 +73,317 @@ export class ApplicationsService {
       }
     }
 
+    // Invalidate relevant caches
+    await this.invalidateApplicationCaches(userId);
+
     return application;
   }
 
-  async findAll(page: number = 1, limit: number = 10, status?: string) {
-    const skip = (page - 1) * limit;
-    const where = status ? { status: status as any } : {};
+  private async invalidateApplicationCaches(userId?: string) {
+    // Invalidate specific cache patterns - since Redis doesn't support wildcard deletes,
+    // we'll invalidate common pagination patterns
+    const pagesToClear = [1, 2, 3, 4, 5]; // Clear first 5 pages
+    const limits = [10, 20, 50]; // Common limit values
+    const statuses = ['all', 'DRAFT', 'SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'REJECTED'];
     
-    const [applications, total] = await Promise.all([
-      this.databaseService.application.findMany({
-        where,
-        skip,
-        take: limit,
+    const cacheKeys: string[] = [];
+    
+    // All applications cache keys
+    for (const page of pagesToClear) {
+      for (const limit of limits) {
+        for (const status of statuses) {
+          cacheKeys.push(`applications:all:${page}:${limit}:${status}`);
+        }
+      }
+    }
+    
+    // User-specific cache keys
+    if (userId) {
+      for (const page of pagesToClear) {
+        for (const limit of limits) {
+          cacheKeys.push(`applications:user:${userId}:${page}:${limit}`);
+        }
+      }
+    }
+    
+    // Delete all keys in parallel
+    await Promise.all(cacheKeys.map(key => this.cacheService.del(key)));
+  }
+
+  async findAllSimple(): Promise<any[]> {
+    try {
+      // Try to get from cache first
+      const cached = await this.cacheService.get<any[]>('all_applications');
+      if (cached && Array.isArray(cached)) {
+        this.logger.debug(`Found ${cached.length} applications in cache`);
+        return cached;
+      }
+
+      // Cache miss - fetch from database
+      this.logger.debug('Cache miss - fetching applications from database');
+      const applications = await this.databaseService.application.findMany({
         include: {
-          user: true,
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
           reviews: {
             include: {
-              reviewer: true,
+              reviewer: {
+                select: {
+                  id: true,
+                  email: true,
+                  firstName: true,
+                  lastName: true,
+                },
+              },
             },
           },
         },
-        orderBy: { createdAt: 'desc' },
-      }),
-      this.databaseService.application.count({ where }),
-    ]);
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
 
-    return {
-      applications,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
+      // Cache the result for 3 minutes
+      await this.cacheService.set('all_applications', applications, 180);
+      this.logger.debug(`Cached ${applications.length} applications`);
+
+      return applications;
+    } catch (error) {
+      this.logger.error('Error in findAllSimple applications:', error);
+      // Fallback to database on cache error
+      return this.databaseService.application.findMany({
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+          reviews: {
+            include: {
+              reviewer: {
+                select: {
+                  id: true,
+                  email: true,
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+    }
+  }
+
+  async findAll(page: number = 1, limit: number = 10, status?: string): Promise<any> {
+    try {
+      const cacheKey = `all_applications:page:${page}:limit:${limit}:status:${status || 'all'}`;
+      
+      // Try to get from cache first
+      const cached = await this.cacheService.get<any>(cacheKey);
+      if (cached) {
+        this.logger.debug(`Found cached paginated applications, page ${page}`);
+        return cached;
+      }
+
+      this.logger.debug(`Cache miss - fetching paginated applications from database, page ${page}`);
+      const skip = (page - 1) * limit;
+      
+      const whereCondition = status ? { status: status as any } : {};
+      
+      const [applications, total] = await Promise.all([
+        this.databaseService.application.findMany({
+          where: whereCondition,
+          skip,
+          take: limit,
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+            reviews: {
+              include: {
+                reviewer: {
+                  select: {
+                    id: true,
+                    email: true,
+                    firstName: true,
+                    lastName: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+        }),
+        this.databaseService.application.count({ where: whereCondition }),
+      ]);
+
+      const result = {
+        applications,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      };
+
+      // Cache the result for 3 minutes
+      await this.cacheService.set(cacheKey, result, 180);
+      this.logger.debug(`Cached paginated applications, page ${page}`);
+
+      return result;
+    } catch (error) {
+      this.logger.error(`Error in findAll applications, page ${page}:`, error);
+      
+      // Fallback to database on cache error
+      const skip = (page - 1) * limit;
+      const whereCondition = status ? { status: status as any } : {};
+      
+      const [applications, total] = await Promise.all([
+        this.databaseService.application.findMany({
+          where: whereCondition,
+          skip,
+          take: limit,
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+            reviews: {
+              include: {
+                reviewer: {
+                  select: {
+                    id: true,
+                    email: true,
+                    firstName: true,
+                    lastName: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+        }),
+        this.databaseService.application.count({ where: whereCondition }),
+      ]);
+
+      return {
+        applications,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      };
+    }
   }
 
   async findUserApplications(userId: string, page: number = 1, limit: number = 10) {
-    const skip = (page - 1) * limit;
-    
-    const [applications, total] = await Promise.all([
-      this.databaseService.application.findMany({
-        where: { userId },
-        skip,
-        take: limit,
-        include: {
-          user: true,
-          reviews: {
-            include: {
-              reviewer: true,
+    try {
+      const cacheKey = `user_applications:${userId}:page:${page}:limit:${limit}`;
+      
+      // Try to get from cache first
+      const cached = await this.cacheService.get<any>(cacheKey);
+      if (cached) {
+        this.logger.debug(`Found cached applications for user ${userId}, page ${page}`);
+        return cached;
+      }
+
+      this.logger.debug(`Cache miss - fetching user applications from database for user ${userId}`);
+      const skip = (page - 1) * limit;
+      
+      const [applications, total] = await Promise.all([
+        this.databaseService.application.findMany({
+          where: { userId },
+          skip,
+          take: limit,
+          include: {
+            user: true,
+            reviews: {
+              include: {
+                reviewer: true,
+              },
             },
           },
-        },
-        orderBy: { createdAt: 'desc' },
-      }),
-      this.databaseService.application.count({ where: { userId } }),
-    ]);
+          orderBy: { createdAt: 'desc' },
+        }),
+        this.databaseService.application.count({ where: { userId } }),
+      ]);
 
-    return {
-      applications,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
+      const result = {
+        applications,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      };
+
+      // Cache the result for 5 minutes
+      await this.cacheService.set(cacheKey, result, 300);
+      this.logger.debug(`Cached user applications for user ${userId}, page ${page}`);
+
+      return result;
+    } catch (error) {
+      this.logger.error(`Error in findUserApplications for user ${userId}:`, error);
+      
+      // Fallback to database on cache error
+      const skip = (page - 1) * limit;
+      
+      const [applications, total] = await Promise.all([
+        this.databaseService.application.findMany({
+          where: { userId },
+          skip,
+          take: limit,
+          include: {
+            user: true,
+            reviews: {
+              include: {
+                reviewer: true,
+              },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+        }),
+        this.databaseService.application.count({ where: { userId } }),
+      ]);
+
+      return {
+        applications,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      };
+    }
   }
 
   async findOne(id: string) {
+    // For now, disable caching for individual items due to typing issues with Redis store
+    // TODO: Fix typing issues with Redis cache store
+    
     const application = await this.databaseService.application.findUnique({
       where: { id },
       include: {
@@ -148,7 +399,7 @@ export class ApplicationsService {
     if (!application) {
       throw new NotFoundException('Application not found');
     }
-
+    
     return application;
   }
 
@@ -206,6 +457,9 @@ export class ApplicationsService {
         }
       }
     }
+
+    // Invalidate caches since application was updated
+    await this.invalidateApplicationCaches(application.userId);
 
     return updatedApplication;
   }

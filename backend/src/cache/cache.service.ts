@@ -1,4 +1,4 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, Logger } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 
 interface CacheManager {
@@ -10,7 +10,31 @@ interface CacheManager {
 
 @Injectable()
 export class CacheService {
-  constructor(@Inject(CACHE_MANAGER) private cacheManager: CacheManager) {}
+  private readonly logger = new Logger(CacheService.name);
+
+  constructor(@Inject(CACHE_MANAGER) private cacheManager: CacheManager) {
+    this.testConnection();
+  }
+
+  private async testConnection() {
+    try {
+      const testKey = 'redis-connection-test';
+      const testValue = 'connected';
+      
+      await this.cacheManager.set(testKey, testValue, 10);
+      const result = await this.cacheManager.get(testKey);
+      
+      if (result === testValue) {
+        this.logger.log('✅ Redis cache connection successful');
+      } else {
+        this.logger.warn('⚠️ Cache connection test failed - value mismatch');
+      }
+      
+      await this.cacheManager.del(testKey);
+    } catch (error) {
+      this.logger.error('❌ Cache connection test failed:', error.message);
+    }
+  }
 
   // User session cache
   async getUserSession(userId: string): Promise<any> {
@@ -18,7 +42,7 @@ export class CacheService {
   }
 
   async setUserSession(userId: string, userData: any, ttl: number = 3600): Promise<void> {
-    await this.cacheManager.set(`user:${userId}`, userData, ttl * 1000); // Convert to milliseconds
+    await this.cacheManager.set(`user:${userId}`, userData, ttl); // TTL in seconds for Redis
   }
 
   async deleteUserSession(userId: string): Promise<void> {
@@ -32,7 +56,7 @@ export class CacheService {
   }
 
   async setApplications(userId: string, applications: any[], ttl: number = 300): Promise<void> {
-    await this.cacheManager.set(`applications:${userId}`, applications, ttl * 1000);
+    await this.cacheManager.set(`applications:${userId}`, applications, ttl); // TTL in seconds for Redis
   }
 
   async invalidateApplications(userId: string): Promise<void> {
@@ -49,7 +73,7 @@ export class CacheService {
     const key = `rate:${identifier}`;
     const current = await this.getRateLimit(identifier);
     const newCount = current + 1;
-    await this.cacheManager.set(key, newCount, ttl * 1000);
+    await this.cacheManager.set(key, newCount, ttl); // TTL in seconds for Redis
     return newCount;
   }
 
@@ -59,8 +83,8 @@ export class CacheService {
   }
 
   async set<T>(key: string, value: T, ttl?: number): Promise<void> {
-    const ttlMs = ttl ? ttl * 1000 : undefined;
-    await this.cacheManager.set(key, value, ttlMs);
+    // TTL is in seconds for Redis store
+    await this.cacheManager.set(key, value, ttl);
   }
 
   async del(key: string): Promise<void> {

@@ -78,10 +78,8 @@ export class MCPClientService {
         params: {
           name: 'analyze_idea_similarity',
           arguments: {
-            userApplication,
-            externalData: {
-              ycCompanies: [] // Let MCP server fetch the full YC company data
-            }
+            userApplication
+            // Don't pass externalData at all, let MCP server fetch YC companies from API
           }
         }
       };

@@ -250,7 +250,8 @@ class ExternalReviewMCPServer {
         console.log('📡 Fetching YC companies from API...');
         try {
           const ycResponse = await this.fetchYCCompanies({ forSimilarityAnalysis: true });
-          ycCompanies = ycResponse.content?.[0]?.text ? JSON.parse(ycResponse.content[0].text) : [];
+          const ycData = ycResponse.content?.[0]?.text ? JSON.parse(ycResponse.content[0].text) : null;
+          ycCompanies = ycData?.companies || [];
           console.log(`📊 Fetched ${ycCompanies.length} YC companies`);
         } catch (fetchError) {
           console.error('⚠️ Failed to fetch YC companies:', fetchError.message);
@@ -467,11 +468,11 @@ Be precise and thorough in your analysis.
           const normalizedUserTitle = userTitle.replace(/[^a-z0-9]/g, '');
           const normalizedCompanyName = name.replace(/[^a-z0-9]/g, '');
           
-          // Name match criteria: high similarity OR exact match OR containment
-          const isHighSimilarity = nameSimilarity > 0.85;
+          // Name match criteria: very high similarity OR exact match OR significant containment
+          const isHighSimilarity = nameSimilarity > 0.9; // Increased from 0.85 to be more lenient
           const isExactMatch = normalizedUserTitle === normalizedCompanyName;
-          const isContainedMatch = (normalizedUserTitle.length > 3 && normalizedCompanyName.includes(normalizedUserTitle)) ||
-                                  (normalizedCompanyName.length > 3 && normalizedUserTitle.includes(normalizedCompanyName));
+          const isContainedMatch = (normalizedUserTitle.length > 4 && normalizedCompanyName.includes(normalizedUserTitle)) ||
+                                  (normalizedCompanyName.length > 4 && normalizedUserTitle.includes(normalizedCompanyName));
           
           if (isHighSimilarity || isExactMatch || isContainedMatch) {
             console.log(`❌ NAME MATCH FOUND: ${company.name} (similarity: ${Math.round(nameSimilarity * 100)}%)`);
@@ -491,14 +492,14 @@ Be precise and thorough in your analysis.
               return this.createRejectionResponse(company, 'EXACT_NAME_MATCH', {
                 nameSimilarity: Math.round(nameSimilarity * 100),
                 problemSimilarity: Math.round(problemSimilarity * 100),
-                reason: `Your application uses the exact same name "${userApplication.title}" as existing Y Combinator company "${company.name}". This is not allowed regardless of the business concept.`
+                reason: `Your application uses the exact same name "${userApplication.title}" as existing Y Combinator company "${company.name}". This is not allowed regardless of how different your business concept might be. Company names must be unique.`
               }, userApplication);
             }
             
             // For high similarity names (but not exact), reject if problem similarity is also high
-            // For very high similarity names (>95%), reject if problem similarity is >10%
-            // For high similarity names (85-95%), reject if problem similarity is >30%
-            const rejectionThreshold = nameSimilarity > 0.95 ? 0.1 : 0.3;
+            // Be more lenient: For very high similarity names (>98%), reject if problem similarity is >20%
+            // For high similarity names (90-98%), reject if problem similarity is >50%
+            const rejectionThreshold = nameSimilarity > 0.98 ? 0.2 : 0.5;
             
             if (problemSimilarity > rejectionThreshold) {
               return this.createRejectionResponse(company, 'NAME_AND_PROBLEM_MATCH', {
@@ -563,9 +564,23 @@ Be precise and thorough in your analysis.
       console.log(`🎯 Analysis complete. Highest business similarity: ${Math.round(highestSimilarity * 100)}% with ${mostSimilarCompany?.name || 'no company'}`);
       console.log(`📊 Found ${similarCompanies.length} companies with >25% similarity`);
       
-      // Step 3: Make decision based on business concept similarity
-      // Reject if business concept similarity is high (>40%)
-      const businessConceptThreshold = 0.4;
+      // Step 3: Check for unique differentiators before making final decision
+      if (highestSimilarity > 0.35 && mostSimilarCompany) {
+        console.log('\n🔍 Checking for unique differentiators...');
+        const hasUniqueDifferentiators = this.checkForUniqueDifferentiators(userApplication, mostSimilarCompany, similarityDetails);
+        
+        if (hasUniqueDifferentiators.isUnique) {
+          console.log(`✅ APPROVING: Found unique differentiators - ${hasUniqueDifferentiators.reason}`);
+          return this.createApprovalResponse(mostSimilarCompany, {
+            overallSimilarity: Math.round(highestSimilarity * 100),
+            reason: `Despite ${Math.round(highestSimilarity * 100)}% similarity to ${mostSimilarCompany.name}, your application has unique differentiators: ${hasUniqueDifferentiators.reason}`
+          }, userApplication);
+        }
+      }
+      
+      // Step 4: Make decision based on business concept similarity
+      // Reject if business concept similarity is high (>50% - more lenient threshold)
+      const businessConceptThreshold = 0.5;
       
       if (highestSimilarity > businessConceptThreshold && mostSimilarCompany) {
         console.log(`❌ REJECTING: Business concept too similar (${Math.round(highestSimilarity * 100)}%) to ${mostSimilarCompany.name}`);
@@ -755,17 +770,17 @@ Be precise and thorough in your analysis.
 
   // Helper method for calculating overall business similarity
   calculateOverallBusinessSimilarity(analysis) {
-    // Weighted calculation based on importance:
-    // Problem similarity is most important (30%)
-    // Industry/vertical similarity is very important (30%)
-    // Solution similarity is important (20%)
-    // Tech/approach similarity is moderate (15%)
+    // Weighted calculation based on importance (More lenient for Y Combinator style evaluation):
+    // Problem similarity is most important (40%)
+    // Solution similarity is very important (30%)
+    // Industry/vertical similarity is moderate (15%) - reduced weight
+    // Tech/approach similarity is moderate (10%)
     // Business model similarity is least (5%)
     
-    return (analysis.problemSimilarity * 0.3) + 
-           (analysis.industrySimilarity * 0.3) + 
-           (analysis.solutionSimilarity * 0.2) + 
-           (analysis.techSimilarity * 0.15) + 
+    return (analysis.problemSimilarity * 0.4) + 
+           (analysis.solutionSimilarity * 0.3) + 
+           (analysis.industrySimilarity * 0.15) + 
+           (analysis.techSimilarity * 0.1) + 
            (analysis.businessModelSimilarity * 0.05);
   }
 
@@ -2052,6 +2067,131 @@ Be thorough, realistic, and provide actionable insights for budget planning.
     } catch (error) {
       console.error('Error during cleanup:', error);
     }
+  }
+
+  // Helper method to check for unique differentiators
+  checkForUniqueDifferentiators(userApplication, mostSimilarCompany, similarityDetails) {
+    const userDesc = userApplication.description.toLowerCase();
+    const userProblem = (userApplication.problemStatement || '').toLowerCase();
+    const userSolution = (userApplication.proposedSolution || '').toLowerCase();
+    const userTarget = (userApplication.targetMarket || '').toLowerCase();
+    const userModel = (userApplication.businessModel || '').toLowerCase();
+    
+    const companyDesc = (mostSimilarCompany.description || '').toLowerCase();
+    const companyOneLiner = (mostSimilarCompany.oneLiner || '').toLowerCase();
+    
+    // Check for technology differentiators
+    const advancedTechKeywords = [
+      'ai', 'machine learning', 'deep learning', 'neural network', 'computer vision',
+      'blockchain', 'cryptocurrency', 'quantum', 'iot', 'edge computing', 'ar', 'vr',
+      'natural language processing', 'robotics', 'automation', 'cloud native'
+    ];
+    
+    let userTechCount = 0;
+    let companyTechCount = 0;
+    let uniqueTechFound = [];
+    
+    for (const tech of advancedTechKeywords) {
+      const userHasTech = userDesc.includes(tech) || userSolution.includes(tech);
+      const companyHasTech = companyDesc.includes(tech) || companyOneLiner.includes(tech);
+      
+      if (userHasTech) userTechCount++;
+      if (companyHasTech) companyTechCount++;
+      if (userHasTech && !companyHasTech) {
+        uniqueTechFound.push(tech);
+      }
+    }
+    
+    // If user has significantly more advanced tech (2+ unique technologies)
+    if (uniqueTechFound.length >= 2) {
+      return {
+        isUnique: true,
+        reason: `Advanced technology differentiation using ${uniqueTechFound.join(', ')}`
+      };
+    }
+    
+    // Check for target market differentiation
+    const marketKeywords = [
+      'small business', 'enterprise', 'startup', 'consumer', 'b2b', 'b2c',
+      'healthcare', 'education', 'government', 'non-profit', 'developer',
+      'remote', 'mobile', 'global', 'local', 'niche', 'specialized'
+    ];
+    
+    let uniqueMarketFound = [];
+    for (const market of marketKeywords) {
+      const userHasMarket = userTarget.includes(market) || userDesc.includes(market);
+      const companyHasMarket = companyDesc.includes(market) || companyOneLiner.includes(market);
+      
+      if (userHasMarket && !companyHasMarket) {
+        uniqueMarketFound.push(market);
+      }
+    }
+    
+    if (uniqueMarketFound.length >= 1 && similarityDetails.problemSimilarity < 0.7) {
+      return {
+        isUnique: true,
+        reason: `Different target market focus: ${uniqueMarketFound.join(', ')}`
+      };
+    }
+    
+    // Check for business model differentiation
+    const businessModelKeywords = [
+      'freemium', 'subscription', 'marketplace', 'commission', 'transaction fee',
+      'licensing', 'white label', 'api', 'usage-based', 'tiered pricing'
+    ];
+    
+    let uniqueModelFound = [];
+    for (const model of businessModelKeywords) {
+      const userHasModel = userModel.includes(model) || userDesc.includes(model);
+      const companyHasModel = companyDesc.includes(model) || companyOneLiner.includes(model);
+      
+      if (userHasModel && !companyHasModel) {
+        uniqueModelFound.push(model);
+      }
+    }
+    
+    if (uniqueModelFound.length >= 1 && similarityDetails.solutionSimilarity < 0.6) {
+      return {
+        isUnique: true,
+        reason: `Different business model approach: ${uniqueModelFound.join(', ')}`
+      };
+    }
+    
+    // Check for geographical differentiation
+    const geographicalKeywords = [
+      'asia', 'europe', 'africa', 'latin america', 'india', 'china', 'japan',
+      'emerging markets', 'developing countries', 'rural', 'urban', 'international'
+    ];
+    
+    let uniqueGeoFound = [];
+    for (const geo of geographicalKeywords) {
+      const userHasGeo = userTarget.includes(geo) || userDesc.includes(geo);
+      const companyHasGeo = companyDesc.includes(geo) || companyOneLiner.includes(geo);
+      
+      if (userHasGeo && !companyHasGeo) {
+        uniqueGeoFound.push(geo);
+      }
+    }
+    
+    if (uniqueGeoFound.length >= 1) {
+      return {
+        isUnique: true,
+        reason: `Geographical market differentiation: ${uniqueGeoFound.join(', ')}`
+      };
+    }
+    
+    // If problem similarity is low even with high overall similarity, approve
+    if (similarityDetails.problemSimilarity < 0.4) {
+      return {
+        isUnique: true,
+        reason: 'Fundamentally different problem being solved despite industry overlap'
+      };
+    }
+    
+    return {
+      isUnique: false,
+      reason: 'No significant unique differentiators found'
+    };
   }
 }
 
