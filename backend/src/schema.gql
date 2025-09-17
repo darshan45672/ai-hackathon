@@ -26,6 +26,7 @@ type Application {
   estimatedCost: Float
   githubRepo: String
   id: ID!
+  implementation: String
   isActive: Boolean!
   problemStatement: String!
   rejectionReason: String
@@ -75,6 +76,7 @@ input CreateApplicationInput {
   description: String!
   estimatedCost: Float
   githubRepo: String
+  implementation: String
   problemStatement: String!
   solution: String!
   status: ApplicationStatus
@@ -209,6 +211,7 @@ input UpdateApplicationInput {
   description: String
   estimatedCost: Float
   githubRepo: String
+  implementation: String
   problemStatement: String
   rejectionReason: String
   solution: String

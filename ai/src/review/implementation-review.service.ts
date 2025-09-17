@@ -114,12 +114,20 @@ export class ImplementationReviewService {
     // Analyze resource requirements
     const resourceScore = this.analyzeResourceRequirements(application);
     
-    // Calculate overall score (weighted average)
+    // NEW: Analyze implementation approach if provided
+    const implementationScore = this.analyzeImplementationApproach(application);
+    
+    // Calculate overall score (weighted average with implementation approach)
+    const weights = application.implementation ? 
+      { technical: 0.25, team: 0.2, timeframe: 0.2, resource: 0.15, implementation: 0.2 } :
+      { technical: 0.3, team: 0.25, timeframe: 0.25, resource: 0.2, implementation: 0 };
+    
     const overallScore = (
-      technicalComplexityScore * 0.3 +
-      teamCapabilityScore * 0.25 +
-      timeframeScore * 0.25 +
-      resourceScore * 0.2
+      technicalComplexityScore * weights.technical +
+      teamCapabilityScore * weights.team +
+      timeframeScore * weights.timeframe +
+      resourceScore * weights.resource +
+      implementationScore * weights.implementation
     );
 
     // Identify issues
@@ -128,15 +136,27 @@ export class ImplementationReviewService {
     if (teamCapabilityScore < 0.6) issues.push('Insufficient team size/capability');
     if (timeframeScore < 0.6) issues.push('Unrealistic timeframe');
     if (resourceScore < 0.6) issues.push('Insufficient resources');
+    if (application.implementation && implementationScore < 0.6) {
+      issues.push('Implementation approach has significant gaps or concerns');
+    }
 
     // Generate recommendation
     let recommendation = '';
     if (overallScore >= 0.8) {
       recommendation = 'Highly feasible project with good chances of success.';
+      if (application.implementation && implementationScore >= 0.8) {
+        recommendation += ' The implementation approach is well-thought-out and detailed.';
+      }
     } else if (overallScore >= 0.6) {
       recommendation = 'Feasible project but requires careful planning and execution.';
+      if (application.implementation && implementationScore < 0.7) {
+        recommendation += ' Consider refining the implementation approach for better clarity.';
+      }
     } else {
       recommendation = 'Project faces significant implementation challenges and may not be feasible within current constraints.';
+      if (application.implementation && implementationScore < 0.5) {
+        recommendation += ' The current implementation approach needs substantial improvement.';
+      }
     }
 
     return {
@@ -144,6 +164,7 @@ export class ImplementationReviewService {
       teamCapabilityScore,
       timeframeScore,
       resourceScore,
+      implementationScore,
       overallScore,
       issues,
       recommendation,
@@ -152,6 +173,7 @@ export class ImplementationReviewService {
         team: this.getTeamCapabilityDetails(application),
         timeframe: this.getTimeframeDetails(application),
         resources: this.getResourceDetails(application),
+        implementation: this.getImplementationDetails(application),
       },
     };
   }
@@ -312,6 +334,158 @@ export class ImplementationReviewService {
       estimatedResourceNeeds: this.analyzeResourceRequirements(application) > 0.7 ? 'Low' : 
                              this.analyzeResourceRequirements(application) > 0.5 ? 'Medium' : 'High',
       keyResourceRequirements: this.identifyResourceRequirements(application),
+    };
+  }
+
+  private analyzeImplementationApproach(application: any): number {
+    // If no implementation details provided, return neutral score
+    if (!application.implementation || application.implementation.trim().length === 0) {
+      return 0.7; // Neutral score when no implementation details provided
+    }
+
+    const implementation = application.implementation.toLowerCase();
+    let score = 0.5; // Start with baseline score
+    
+    // Positive indicators in implementation approach
+    const positiveIndicators = [
+      'step-by-step', 'phase', 'milestone', 'architecture', 'design pattern',
+      'testing', 'deployment', 'scalability', 'security', 'performance',
+      'api design', 'database schema', 'user interface', 'user experience',
+      'validation', 'error handling', 'monitoring', 'logging', 'documentation',
+      'version control', 'git', 'ci/cd', 'continuous integration', 'agile',
+      'sprint', 'iteration', 'prototype', 'mvp', 'minimum viable product',
+      'timeline', 'schedule', 'deadline', 'deliverable', 'requirement',
+      'specification', 'wireframe', 'mockup', 'framework', 'library',
+      'best practice', 'standard', 'convention', 'pattern', 'methodology'
+    ];
+
+    // Technical depth indicators
+    const technicalDepthIndicators = [
+      'algorithm', 'data structure', 'optimization', 'cache', 'load balancing',
+      'microservice', 'container', 'docker', 'kubernetes', 'cloud',
+      'aws', 'azure', 'gcp', 'serverless', 'lambda', 'function',
+      'database', 'sql', 'nosql', 'mongodb', 'postgresql', 'mysql',
+      'redis', 'elasticsearch', 'queue', 'message', 'event',
+      'webhook', 'websocket', 'real-time', 'streaming'
+    ];
+
+    // Risk awareness indicators
+    const riskAwarenessIndicators = [
+      'challenge', 'risk', 'limitation', 'constraint', 'dependency',
+      'fallback', 'backup', 'contingency', 'alternative', 'mitigation',
+      'consideration', 'trade-off', 'assumption', 'potential issue',
+      'complexity', 'difficulty', 'obstacle', 'blocker'
+    ];
+
+    // Vague or concerning indicators
+    const negativeIndicators = [
+      'just', 'simply', 'easily', 'quickly', 'basic', 'straightforward',
+      'no problem', 'piece of cake', 'trivial', 'obvious', 'clear',
+      'i think', 'maybe', 'probably', 'might', 'could be', 'should work',
+      'not sure', 'unclear', 'tbd', 'to be determined', 'figure out later'
+    ];
+
+    // Calculate scores for each category
+    const positiveMatches = positiveIndicators.filter(indicator => 
+      implementation.includes(indicator)
+    ).length;
+    
+    const technicalMatches = technicalDepthIndicators.filter(indicator => 
+      implementation.includes(indicator)
+    ).length;
+    
+    const riskMatches = riskAwarenessIndicators.filter(indicator => 
+      implementation.includes(indicator)
+    ).length;
+    
+    const negativeMatches = negativeIndicators.filter(indicator => 
+      implementation.includes(indicator)
+    ).length;
+
+    // Adjust score based on findings
+    score += Math.min(0.3, positiveMatches * 0.03); // Up to 0.3 boost
+    score += Math.min(0.2, technicalMatches * 0.02); // Up to 0.2 boost
+    score += Math.min(0.1, riskMatches * 0.02); // Up to 0.1 boost for risk awareness
+    score -= Math.min(0.3, negativeMatches * 0.05); // Up to 0.3 penalty
+
+    // Length and structure bonus
+    const wordCount = implementation.split(/\s+/).length;
+    if (wordCount >= 200) score += 0.1; // Detailed implementation
+    else if (wordCount >= 100) score += 0.05; // Moderate detail
+    else if (wordCount < 30) score -= 0.1; // Too brief
+
+    // Check for structured approach (numbered lists, bullet points, etc.)
+    const hasStructure = /(\d+\.|•|\*|-|\n\s*\w+:)/.test(application.implementation);
+    if (hasStructure) score += 0.1;
+
+    // Ensure score is within bounds
+    return Math.max(0, Math.min(1, score));
+  }
+
+  private getImplementationDetails(application: any): any {
+    if (!application.implementation) {
+      return {
+        hasImplementationPlan: false,
+        detail: 'No implementation approach provided',
+        score: 0.7,
+        strengths: [],
+        concerns: ['Implementation approach not specified'],
+        recommendations: ['Provide detailed implementation plan', 'Include technical architecture', 'Specify development phases']
+      };
+    }
+
+    const implementation = application.implementation.toLowerCase();
+    const score = this.analyzeImplementationApproach(application);
+    
+    const strengths: string[] = [];
+    const concerns: string[] = [];
+    const recommendations: string[] = [];
+
+    // Analyze strengths
+    if (implementation.includes('step') || implementation.includes('phase')) {
+      strengths.push('Shows structured, phased approach');
+    }
+    if (implementation.includes('testing')) {
+      strengths.push('Includes testing considerations');
+    }
+    if (implementation.includes('security')) {
+      strengths.push('Addresses security concerns');
+    }
+    if (implementation.includes('scalability')) {
+      strengths.push('Considers scalability requirements');
+    }
+
+    // Identify concerns
+    if (implementation.includes('not sure') || implementation.includes('maybe')) {
+      concerns.push('Contains uncertainty about implementation details');
+    }
+    if (implementation.split(/\s+/).length < 50) {
+      concerns.push('Implementation plan lacks sufficient detail');
+    }
+    if (!implementation.includes('architecture') && !implementation.includes('design')) {
+      concerns.push('Missing architectural design considerations');
+    }
+
+    // Generate recommendations
+    if (score < 0.7) {
+      recommendations.push('Provide more detailed technical approach');
+      recommendations.push('Include system architecture overview');
+      recommendations.push('Specify technology stack justification');
+    }
+    if (!implementation.includes('timeline')) {
+      recommendations.push('Add development timeline and milestones');
+    }
+    if (!implementation.includes('risk')) {
+      recommendations.push('Identify potential risks and mitigation strategies');
+    }
+
+    return {
+      hasImplementationPlan: true,
+      detail: score > 0.8 ? 'Comprehensive' : score > 0.6 ? 'Adequate' : 'Needs improvement',
+      score,
+      strengths,
+      concerns,
+      recommendations
     };
   }
 

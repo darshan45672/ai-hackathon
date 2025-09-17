@@ -45,6 +45,7 @@ function SubmitContent() {
     description: "",
     problemStatement: "",
     solution: "",
+    implementation: "",
     techStack: [] as string[],
     teamSize: "",
     teamMembers: [""],
@@ -211,6 +212,7 @@ function SubmitContent() {
         description: formData.description.trim() || undefined,
         problemStatement: formData.problemStatement.trim() || undefined,
         solution: formData.solution.trim() || undefined,
+        implementation: formData.implementation.trim() || undefined,
         techStack: formData.techStack,
         teamSize: formData.teamSize ? parseInt(formData.teamSize) : undefined,
         teamMembers: formData.teamMembers.filter(member => member.trim()),
@@ -325,6 +327,22 @@ function SubmitContent() {
                   value={formData.solution}
                   onChange={(e) => setFormData(prev => ({ ...prev, solution: e.target.value }))}
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="implementation">Implementation Approach</Label>
+                <Textarea
+                  id="implementation"
+                  placeholder="Describe your technical implementation approach, architecture, development phases, and methodologies you plan to use..."
+                  rows={5}
+                  value={formData.implementation}
+                  onChange={(e) => setFormData(prev => ({ ...prev, implementation: e.target.value }))}
+                />
+                <p className="text-sm text-muted-foreground">
+                  💡 Include details about your technical architecture, development timeline, tools, frameworks, 
+                  testing approach, and any potential challenges you've considered. This helps our AI review system 
+                  better assess the feasibility of your implementation.
+                </p>
               </div>
             </CardContent>
           </Card>

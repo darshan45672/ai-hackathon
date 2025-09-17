@@ -56,7 +56,7 @@ start_services() {
 
 
 build_services() {
-    echo_info "Building AI Hackathon platform with monitoring..."
+    echo_info "Building AI Hackathon platform with monitoring using no-cache..."
     
     # Check if .env.development exists
     if [ ! -f ".env.development" ]; then

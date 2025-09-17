@@ -83,6 +83,7 @@ model Application {
   description     String
   problemStatement String
   solution        String
+  implementation  String?          // Detailed implementation approach from applicant (optional for existing apps)
   techStack       String[]
   teamSize        Int
   teamMembers     String[]

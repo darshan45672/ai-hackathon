@@ -84,6 +84,9 @@ export class Application {
   @Field()
   solution: string;
 
+  @Field({ nullable: true })
+  implementation?: string;
+
   @Field(() => [String])
   techStack: string[];
 

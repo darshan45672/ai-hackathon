@@ -17,6 +17,10 @@ export class CreateApplicationDto {
   @IsNotEmpty()
   solution: string;
 
+  @IsOptional()
+  @IsString()
+  implementation?: string;
+
   @IsArray()
   @IsString({ each: true })
   techStack: string[];

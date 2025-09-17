@@ -76,6 +76,11 @@ export class CreateApplicationInput {
   @IsString()
   solution: string;
 
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  implementation?: string;
+
   @Field(() => [String])
   @IsArray()
   @IsString({ each: true })
@@ -134,6 +139,11 @@ export class UpdateApplicationInput {
   @IsOptional()
   @IsString()
   solution?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  implementation?: string;
 
   @Field(() => [String], { nullable: true })
   @IsOptional()
