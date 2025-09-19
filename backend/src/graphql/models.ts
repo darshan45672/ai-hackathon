@@ -87,6 +87,12 @@ export class Application {
   @Field({ nullable: true })
   implementation?: string;
 
+  @Field({ nullable: true })
+  targetAudience?: string;
+
+  @Field({ nullable: true })
+  businessOutcome?: string;
+
   @Field(() => [String])
   techStack: string[];
 

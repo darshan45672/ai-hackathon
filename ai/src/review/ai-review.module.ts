@@ -7,6 +7,8 @@ import { ExternalIdeaReviewService } from './external-idea-review.service';
 import { InternalIdeaReviewService } from './internal-idea-review.service';
 import { CategorizationService } from './categorization.service';
 import { ImplementationReviewService } from './implementation-review.service';
+import { TargetAudienceReviewService } from './target-audience-review.service';
+import { BusinessOutcomeReviewService } from './business-outcome-review.service';
 import { CostReviewService } from './cost-review.service';
 import { CustomerImpactReviewService } from './customer-impact-review.service';
 import { WebSocketClient } from '../websocket/websocket-client.service';
@@ -24,6 +26,8 @@ import { MCPClientService } from '../mcp/mcp-client.service';
     InternalIdeaReviewService,
     CategorizationService,
     ImplementationReviewService,
+    TargetAudienceReviewService,
+    BusinessOutcomeReviewService,
     CostReviewService,
     CustomerImpactReviewService,
     WebSocketClient,

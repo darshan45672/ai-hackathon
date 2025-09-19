@@ -46,6 +46,8 @@ function SubmitContent() {
     problemStatement: "",
     solution: "",
     implementation: "",
+    targetAudience: "",
+    businessOutcome: "",
     techStack: [] as string[],
     teamSize: "",
     teamMembers: [""],
@@ -213,6 +215,8 @@ function SubmitContent() {
         problemStatement: formData.problemStatement.trim() || undefined,
         solution: formData.solution.trim() || undefined,
         implementation: formData.implementation.trim() || undefined,
+        targetAudience: formData.targetAudience.trim() || undefined,
+        businessOutcome: formData.businessOutcome.trim() || undefined,
         techStack: formData.techStack,
         teamSize: formData.teamSize ? parseInt(formData.teamSize) : undefined,
         teamMembers: formData.teamMembers.filter(member => member.trim()),
@@ -342,6 +346,36 @@ function SubmitContent() {
                   💡 Include details about your technical architecture, development timeline, tools, frameworks, 
                   testing approach, and any potential challenges you've considered. This helps our AI review system 
                   better assess the feasibility of your implementation.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="targetAudience">Target Audience</Label>
+                <Textarea
+                  id="targetAudience"
+                  placeholder="Describe your target market and audience in detail. Who will use your solution? Include demographics, behaviors, needs, and market size..."
+                  rows={4}
+                  value={formData.targetAudience}
+                  onChange={(e) => setFormData(prev => ({ ...prev, targetAudience: e.target.value }))}
+                />
+                <p className="text-sm text-muted-foreground">
+                  🎯 Specify your primary and secondary target segments, geographic scope, user personas, 
+                  market reach strategies, and how you plan to access your target audience.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="businessOutcome">Expected Business Outcomes</Label>
+                <Textarea
+                  id="businessOutcome"
+                  placeholder="Define your expected business outcomes and goals. What success metrics will you track? Include revenue targets, growth expectations, and timelines..."
+                  rows={4}
+                  value={formData.businessOutcome}
+                  onChange={(e) => setFormData(prev => ({ ...prev, businessOutcome: e.target.value }))}
+                />
+                <p className="text-sm text-muted-foreground">
+                  📈 Include specific financial goals, operational improvements, customer impact metrics, 
+                  timeline for achieving outcomes, and how you'll measure success.
                 </p>
               </div>
             </CardContent>

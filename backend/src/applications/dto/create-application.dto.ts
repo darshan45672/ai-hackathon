@@ -21,6 +21,14 @@ export class CreateApplicationDto {
   @IsString()
   implementation?: string;
 
+  @IsOptional()
+  @IsString()
+  targetAudience?: string;
+
+  @IsOptional()
+  @IsString()
+  businessOutcome?: string;
+
   @IsArray()
   @IsString({ each: true })
   techStack: string[];

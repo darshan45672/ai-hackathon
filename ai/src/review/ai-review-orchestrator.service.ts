@@ -4,6 +4,8 @@ import { ExternalIdeaReviewService } from './external-idea-review.service';
 import { InternalIdeaReviewService } from './internal-idea-review.service';
 import { CategorizationService } from './categorization.service';
 import { ImplementationReviewService } from './implementation-review.service';
+import { TargetAudienceReviewService } from './target-audience-review.service';
+import { BusinessOutcomeReviewService } from './business-outcome-review.service';
 import { CostReviewService } from './cost-review.service';
 import { CustomerImpactReviewService } from './customer-impact-review.service';
 
@@ -17,6 +19,8 @@ export class AIReviewOrchestratorService {
     private readonly internalIdeaReviewService: InternalIdeaReviewService,
     private readonly categorizationService: CategorizationService,
     private readonly implementationReviewService: ImplementationReviewService,
+    private readonly targetAudienceReviewService: TargetAudienceReviewService,
+    private readonly businessOutcomeReviewService: BusinessOutcomeReviewService,
     private readonly costReviewService: CostReviewService,
     private readonly customerImpactReviewService: CustomerImpactReviewService,
   ) {}
@@ -109,7 +113,41 @@ export class AIReviewOrchestratorService {
         return;
       }
 
-      // Step 5: Cost Review
+      // Step 5: Target Audience Analysis
+      await this.databaseService.application.update({
+        where: { id: applicationId },
+        data: { status: 'TARGET_AUDIENCE_REVIEW' },
+      });
+      
+      await this.targetAudienceReviewService.reviewTargetAudience(applicationId);
+      
+      const afterTargetAudience = await this.databaseService.application.findUnique({
+        where: { id: applicationId },
+      });
+      
+      if (afterTargetAudience?.status === 'REJECTED') {
+        this.logger.log(`Application ${applicationId} rejected in target audience review`);
+        return;
+      }
+
+      // Step 6: Business Outcome Analysis
+      await this.databaseService.application.update({
+        where: { id: applicationId },
+        data: { status: 'BUSINESS_OUTCOME_REVIEW' },
+      });
+      
+      await this.businessOutcomeReviewService.reviewBusinessOutcome(applicationId);
+      
+      const afterBusinessOutcome = await this.databaseService.application.findUnique({
+        where: { id: applicationId },
+      });
+      
+      if (afterBusinessOutcome?.status === 'REJECTED') {
+        this.logger.log(`Application ${applicationId} rejected in business outcome review`);
+        return;
+      }
+
+      // Step 7: Cost Review
       await this.costReviewService.reviewCostFeasibility(applicationId);
       
       const afterCost = await this.databaseService.application.findUnique({
@@ -121,7 +159,7 @@ export class AIReviewOrchestratorService {
         return;
       }
 
-      // Step 6: Customer Impact Review
+      // Step 8: Customer Impact Review
       await this.customerImpactReviewService.reviewCustomerImpact(applicationId);
       
       const finalStatus = await this.databaseService.application.findUnique({
@@ -162,6 +200,8 @@ export class AIReviewOrchestratorService {
       'INTERNAL_IDEA',
       'CATEGORIZATION',
       'IMPLEMENTATION_FEASIBILITY',
+      'TARGET_AUDIENCE_ANALYSIS',
+      'BUSINESS_OUTCOME_ANALYSIS',
       'COST_ANALYSIS',
       'CUSTOMER_IMPACT',
     ];

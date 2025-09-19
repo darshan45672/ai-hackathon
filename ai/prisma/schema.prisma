@@ -22,6 +22,8 @@ enum ApplicationStatus {
   INTERNAL_IDEA_REVIEW
   CATEGORIZATION
   IMPLEMENTATION_REVIEW
+  TARGET_AUDIENCE_REVIEW
+  BUSINESS_OUTCOME_REVIEW
   COST_REVIEW
   IMPACT_REVIEW
   UNDER_REVIEW
@@ -34,6 +36,8 @@ enum ReviewType {
   INTERNAL_IDEA
   CATEGORIZATION
   IMPLEMENTATION_FEASIBILITY
+  TARGET_AUDIENCE_ANALYSIS
+  BUSINESS_OUTCOME_ANALYSIS
   COST_ANALYSIS
   CUSTOMER_IMPACT
   MANUAL_REVIEW
@@ -83,6 +87,9 @@ model Application {
   description     String
   problemStatement String
   solution        String
+  implementation  String?          // Detailed implementation approach from applicant
+  targetAudience  String?          // Target market and audience details from applicant
+  businessOutcome String?          // Expected business outcomes and goals from applicant
   techStack       String[]
   teamSize        Int
   teamMembers     String[]

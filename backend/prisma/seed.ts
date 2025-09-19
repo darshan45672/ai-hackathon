@@ -103,6 +103,61 @@ async function main() {
       - API rate limiting strategies for OpenAI usage
       - Fallback mechanisms for offline functionality
       - Comprehensive error handling and logging`,
+      targetAudience: `## Primary Target Audience
+      **Software Developers (Individual Contributors)**:
+      - Experience Level: Junior to senior developers (1-10+ years experience)
+      - Company Size: All sizes from startups to enterprise
+      - Programming Languages: Primarily JavaScript, Python, Java, and TypeScript developers
+      - Geographic Scope: Global, with initial focus on North America and Europe
+      - Demographics: 25-40 years old, tech-savvy early adopters
+      
+      ## Secondary Target Audience
+      **Development Teams & Engineering Managers**:
+      - Team leads looking to improve team productivity
+      - CTOs and engineering directors in companies with 10-500 developers
+      - DevOps engineers interested in code quality automation
+      
+      ## Market Segmentation
+      - **Freelance Developers**: Independent contractors seeking productivity tools
+      - **Startup Teams**: Early-stage companies needing to move fast with quality
+      - **Enterprise Teams**: Large organizations focusing on code standardization
+      - **Educational Sector**: Coding bootcamps and computer science students
+      
+      ## Target Market Size
+      - Total Addressable Market: 26+ million developers globally
+      - Serviceable Addressable Market: 15 million VS Code users
+      - Initial Target: 100,000 active developers in first year`,
+      businessOutcome: `## Financial Goals
+      **Revenue Targets**:
+      - Year 1: $500K ARR with freemium model (10% conversion rate)
+      - Year 2: $2M ARR expanding to enterprise licenses
+      - Year 3: $5M ARR with API licensing and white-label solutions
+      - Break-even point: Month 18 with 50,000 active users
+      
+      ## Business Metrics & KPIs
+      **User Adoption**:
+      - Install Rate: 10,000 monthly installs by month 6
+      - Daily Active Users: 25,000 by end of year 1
+      - User Retention: 70% monthly retention rate
+      - Premium Conversion: 10% of free users upgrade within 3 months
+      
+      **Product Performance**:
+      - Code Suggestion Accuracy: >90% relevance rating
+      - Bug Detection Rate: 85% of common issues identified
+      - Time Savings: Average 30% reduction in debugging time
+      - Customer Satisfaction: NPS score >50
+      
+      ## Operational Outcomes
+      - Reduce developer debugging time by 30% on average
+      - Improve code quality scores by 40% in customer projects
+      - Decrease time-to-market for software projects by 20%
+      - Establish market leadership in AI-powered development tools
+      
+      ## Strategic Goals
+      - Build developer ecosystem with 3rd-party integrations
+      - Establish partnerships with major IDE providers
+      - Create defensible moat through proprietary AI models
+      - Scale to support enterprise clients with custom solutions`,
       techStack: ['TypeScript', 'Python', 'TensorFlow', 'OpenAI API', 'React', 'Node.js'],
       teamSize: 3,
       teamMembers: ['John Doe (Team Lead)', 'Jane Smith (AI Engineer)', 'Bob Johnson (Frontend Developer)'],
@@ -148,6 +203,65 @@ async function main() {
       - Device compatibility: Implement adapter pattern for different IoT protocols
       - Data accuracy: Cross-reference multiple data sources for validation
       - User engagement: Gamification elements and social sharing features`,
+      targetAudience: `## Primary Target Audience
+      **Environmentally Conscious Consumers**:
+      - Demographics: Age 25-45, college-educated, middle to upper-middle class
+      - Psychographics: Environmentally aware, tech-savvy, willing to change behaviors
+      - Location: Urban and suburban areas in developed countries
+      - Income: $50,000+ household income with discretionary spending on sustainability
+      
+      ## Secondary Target Audiences
+      **Smart Home Enthusiasts**:
+      - Early adopters of IoT devices and smart home technology
+      - Tech enthusiasts interested in data tracking and optimization
+      - Homeowners with existing smart device ecosystems
+      
+      **Corporate Sustainability Programs**:
+      - Companies implementing employee sustainability initiatives
+      - HR departments promoting eco-friendly workplace culture
+      - B2B market for corporate carbon tracking solutions
+      
+      ## Market Segmentation
+      - **Individual Users**: Personal sustainability tracking (B2C)
+      - **Families**: Household carbon footprint management
+      - **Small Businesses**: Office sustainability monitoring
+      - **Educational Institutions**: Teaching sustainability through data
+      
+      ## Geographic & Market Size
+      - Primary Markets: US, Canada, UK, Germany, Australia
+      - TAM: 500M environmentally conscious consumers globally
+      - SAM: 50M smart home users interested in sustainability
+      - Initial Target: 100K active users in first 18 months`,
+      businessOutcome: `## Financial Objectives
+      **Revenue Model & Targets**:
+      - Freemium mobile app with premium features ($4.99/month)
+      - B2B enterprise licenses ($50-200/employee/year)
+      - Data insights and analytics API ($0.10 per API call)
+      - Year 1: $200K revenue from 10K premium subscribers
+      - Year 2: $1.2M revenue adding B2B customers
+      - Year 3: $3.5M revenue with API monetization
+      
+      ## User Engagement Goals
+      **Adoption & Retention**:
+      - App Downloads: 500K in first year
+      - Monthly Active Users: 150K by month 12
+      - Premium Conversion Rate: 8% of free users
+      - User Retention: 60% monthly retention for premium users
+      - Average Session Time: 5+ minutes per app session
+      
+      ## Environmental Impact Metrics
+      **Sustainability Outcomes**:
+      - Help users reduce carbon footprint by average 15% within 6 months
+      - Track and report 10M+ tons of CO2 equivalent annually
+      - Drive $50M in sustainable purchasing decisions
+      - Partner with 100+ eco-friendly brands for recommendations
+      
+      ## Business Strategy Goals
+      - Establish leadership in personal carbon tracking market
+      - Build comprehensive IoT device integration ecosystem
+      - Create defensible data moat with behavioral insights
+      - Develop B2B SaaS offering for corporate sustainability programs
+      - Potential acquisition target for larger sustainability platforms`,
       techStack: ['React Native', 'Node.js', 'MongoDB', 'IoT APIs', 'Machine Learning'],
       teamSize: 4,
       teamMembers: ['Sarah Green (Product Lead)', 'Mike Chen (Mobile Developer)', 'Lisa Park (Data Scientist)', 'Alex Rivera (Backend Developer)'],
@@ -209,6 +323,72 @@ async function main() {
       - Continuous model monitoring and bias detection
       - Medical professional oversight and validation
       - User feedback loop for model improvement`,
+      targetAudience: `## Primary Target Audience
+      **Health-Conscious Consumers**:
+      - Demographics: Age 25-55, educated professionals, families with children
+      - Psychographics: Proactive about health, comfortable with technology
+      - Behavior: Seek information before doctor visits, use health apps
+      - Geographic: US, Canada, UK initially, expanding to global markets
+      - Pain Points: Long wait times, expensive consultations, uncertainty about symptoms
+      
+      ## Secondary Target Audiences
+      **Underserved Healthcare Markets**:
+      - Rural communities with limited access to healthcare providers
+      - Uninsured or underinsured individuals seeking affordable health guidance
+      - International users in countries with healthcare accessibility challenges
+      
+      **Healthcare Providers & Systems**:
+      - Telemedicine platforms seeking AI-powered triage tools
+      - Primary care practices wanting to streamline patient intake
+      - Health insurance companies interested in preventive care solutions
+      - Occupational health programs for employee wellness
+      
+      ## Market Segmentation
+      - **B2C Individual Users**: Personal health management (primary)
+      - **B2B Healthcare Providers**: Clinical decision support tools
+      - **B2B2C Insurance/Employer**: Employee health benefits platform
+      - **B2G Government**: Public health screening and triage systems
+      
+      ## Target Market Analysis
+      - Global Digital Health Market: $659B by 2025
+      - AI in Healthcare Market: $102B by 2028
+      - Target User Base: 100M+ health app users globally
+      - Initial Focus: 1M active users within 24 months`,
+      businessOutcome: `## Revenue Strategy & Financial Goals
+      **Diversified Revenue Model**:
+      - Consumer Subscriptions: $9.99/month premium health insights
+      - Provider Licensing: $1-5 per assessment for healthcare organizations
+      - API Access: $0.50 per AI assessment for third-party integrations
+      - Data Analytics: Anonymized population health insights to research organizations
+      
+      **Financial Projections**:
+      - Year 1: $1.5M revenue (150K premium users, early B2B pilots)
+      - Year 2: $8M revenue (healthcare provider partnerships, API licensing)
+      - Year 3: $25M revenue (international expansion, enterprise contracts)
+      - Break-even: Month 20 with 300K active premium subscribers
+      
+      ## Healthcare Impact Goals
+      **Clinical Outcomes**:
+      - Reduce unnecessary emergency room visits by 20% for users
+      - Improve early detection of serious conditions by 30%
+      - Decrease time to appropriate care by average 2-3 days
+      - Achieve 90%+ accuracy in symptom severity assessment
+      - Help users save average $500 annually in healthcare costs
+      
+      ## Business & Operational Metrics
+      **Platform Performance**:
+      - Daily Active Users: 500K by end of year 2
+      - Assessment Accuracy: >92% clinical validation rate
+      - User Satisfaction: NPS score >60, 4.5+ app store rating
+      - Provider Partnerships: 1,000+ healthcare organizations
+      - International Expansion: 5 countries by year 3
+      
+      ## Strategic Business Outcomes
+      - Establish market leadership in AI-powered health assessment
+      - Build comprehensive medical knowledge graph and dataset
+      - Create network effects through provider ecosystem
+      - Potential IPO or acquisition by major healthcare/tech company
+      - Contribute to democratizing healthcare access globally`,
       techStack: ['Python', 'TensorFlow', 'Flask', 'React', 'PostgreSQL', 'Medical APIs'],
       teamSize: 5,
       teamMembers: ['Dr. Emma Wilson (Medical Advisor)', 'Tom Zhang (AI Engineer)', 'Rachel Davis (Frontend Developer)', 'James Kim (Backend Developer)', 'Maria Lopez (Data Scientist)'],

@@ -5,6 +5,8 @@ export class ApplicationResponseDto {
   problemStatement: string;
   solution: string;
   implementation?: string;
+  targetAudience?: string;
+  businessOutcome?: string;
   techStack: string[];
   teamSize: number;
   teamMembers: string[];
@@ -27,6 +29,8 @@ export class ApplicationResponseDto {
     this.problemStatement = application.problemStatement;
     this.solution = application.solution;
     this.implementation = application.implementation;
+    this.targetAudience = application.targetAudience;
+    this.businessOutcome = application.businessOutcome;
     this.techStack = application.techStack;
     this.teamSize = application.teamSize;
     this.teamMembers = application.teamMembers;

@@ -19,6 +19,7 @@ type AIReview {
 
 type Application {
   aiReviews: [AIReview!]
+  businessOutcome: String
   category: String
   createdAt: DateTime!
   demoUrl: String
@@ -34,6 +35,7 @@ type Application {
   solution: String!
   status: ApplicationStatus!
   submittedAt: DateTime
+  targetAudience: String
   teamMembers: [String!]!
   teamSize: Float!
   techStack: [String!]!
@@ -59,6 +61,7 @@ input ApplicationFilterInput {
 
 enum ApplicationStatus {
   ACCEPTED
+  BUSINESS_OUTCOME_REVIEW
   CATEGORIZATION
   COST_REVIEW
   DRAFT
@@ -68,10 +71,12 @@ enum ApplicationStatus {
   INTERNAL_IDEA_REVIEW
   REJECTED
   SUBMITTED
+  TARGET_AUDIENCE_REVIEW
   UNDER_REVIEW
 }
 
 input CreateApplicationInput {
+  businessOutcome: String
   demoUrl: String
   description: String!
   estimatedCost: Float
@@ -80,6 +85,7 @@ input CreateApplicationInput {
   problemStatement: String!
   solution: String!
   status: ApplicationStatus
+  targetAudience: String
   teamMembers: [String!]!
   teamSize: Float!
   techStack: [String!]!
@@ -196,6 +202,7 @@ enum ReviewResult {
 }
 
 enum ReviewType {
+  BUSINESS_OUTCOME_ANALYSIS
   CATEGORIZATION
   COST_ANALYSIS
   CUSTOMER_IMPACT
@@ -203,9 +210,11 @@ enum ReviewType {
   IMPLEMENTATION_FEASIBILITY
   INTERNAL_IDEA
   MANUAL_REVIEW
+  TARGET_AUDIENCE_ANALYSIS
 }
 
 input UpdateApplicationInput {
+  businessOutcome: String
   category: String
   demoUrl: String
   description: String
@@ -216,6 +225,7 @@ input UpdateApplicationInput {
   rejectionReason: String
   solution: String
   status: ApplicationStatus
+  targetAudience: String
   teamMembers: [String!]
   teamSize: Float
   techStack: [String!]
